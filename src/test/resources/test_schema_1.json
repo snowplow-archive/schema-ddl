@@ -1,0 +1,99 @@
+{   
+    "type": "object",
+    "properties": {
+        "_id": {
+            "type": "string"
+        },
+        "msg": {
+            "type": "object",
+            "properties": {
+                "_id": {
+                    "type": "string"
+                },
+                "_version": {
+                    "type": "string"
+                },
+                "bgtools_code": {
+                    "type": "number"
+                },
+                "bounce_description": {
+                    "type": "string"
+                },
+                "diag": {
+                    "type": "string"
+                },
+                "email": {
+                    "type": "string"
+                },
+                "metadata": {
+                    "type": "object",
+                    "properties": {
+                        "user_id": {
+                            "type": "number"
+                        }
+                    },
+                    "additionalProperties": false
+                },
+                "sender": {
+                    "type": "string"
+                },
+                "state": {
+                    "type": "string"
+                },
+                "subject": {
+                    "type": "string"
+                },
+                "tags": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "ts": {
+                    "type": "string",
+                    "format": "date-time"
+                },
+                "smtp_events": {
+                    "type": "array",
+                    "items": {
+                        "type": "object",
+                        "properties": {
+                            "ts": {
+                                "type": "string",
+                                "format": "date-time"
+                            },
+                            "type": {
+                                "type": "string"
+                            },
+                            "diag": {
+                                "type": "string"
+                            },
+                            "source_ip": {
+                                "type": "string"
+                            },
+                            "destination_ip": {
+                                "type": "string"
+                            },
+                            "size": {
+                                "type": "integer"
+                            }                   
+                        },
+                        "additionalProperties": false
+                    }
+                },
+                "resends": {
+                    "type": "array"
+                },
+                "template": {
+                    "type": ["string", "null"]
+                }
+            },
+            "additionalProperties": false
+        },
+        "ts": {
+            "type": "string",
+            "format": "date-time"
+        }
+    },
+    "additionalProperties": false
+}
