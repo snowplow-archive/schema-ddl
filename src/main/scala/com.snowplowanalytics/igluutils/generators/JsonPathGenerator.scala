@@ -104,24 +104,3 @@ object JsonPathGenerator {
       JString(strAdd + string)
     }
 }
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
