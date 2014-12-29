@@ -35,7 +35,7 @@ import scala.collection.immutable.ListMap
  */
 object JsonPathGenerator {
 
-  private object JsonPathAddOn {
+  private object JsonPathPrefix {
     val Schema    = "$.schema."
     val Hierarchy = "$.hierarchy."
     val Data      = "$.data."
@@ -48,15 +48,13 @@ object JsonPathGenerator {
     "version"
   )
 
-  private val JsonPathHierarchyFields = List (
+  private val JsonPathHierarchyFields = List(
     "rootId",
     "rootTstamp",
     "refRoot",
     "refTree",
     "refParent"
   )
-
-  private val JsonPathDefaultWrapper = parse("""{"jsonpaths":[]}""")
 
   /**
    * Returns a valid JsonPath file based on the default
@@ -68,22 +66,22 @@ object JsonPathGenerator {
    * @return a JsonPath containing all of the relevant
    *         fields
    */
-  def getJsonPath(flatSchema: Map[String, ListMap[String, Map[String,String]]]): JValue = {
+  def getJsonPathsFile(flatSchema: Map[String, ListMap[String, Map[String,String]]]): JValue = {
 
     // Convert all of the field lists to lists of JStrings
-    val schemaFieldList = transformStringList(JsonPathSchemaFields, JsonPathAddOn.Schema)
-    val hierarchyFieldList = transformStringList(JsonPathHierarchyFields, JsonPathAddOn.Hierarchy)
+    val schemaFieldList = transformStringList(JsonPathSchemaFields, JsonPathPrefix.Schema)
+    val hierarchyFieldList = transformStringList(JsonPathHierarchyFields, JsonPathPrefix.Hierarchy)
     val dataFieldList = flatSchema.get("flat_elems") match {
-      case Some(elems) => transformStringList(elems.keys.toList, JsonPathAddOn.Data)
+      case Some(elems) => transformStringList(elems.keys.toList, JsonPathPrefix.Data)
       case None => List()
     }
 
     // Combine all of the lists into one
     val fieldList = schemaFieldList ++ hierarchyFieldList ++ dataFieldList
 
-    // Insert the field list into the JsonPath default wrapper and return
-    JsonPathDefaultWrapper transformField {
-      case ("jsonpaths", JArray(_)) => ("jsonpaths", JArray(fieldList))
+    // Generate the JsonPath Json
+    compact {
+      ("jsonpaths" -> (( fieldList )) )
     }
   }
 
@@ -97,7 +95,7 @@ object JsonPathGenerator {
    *        of each string
    * @return the List of converted Strings
    */
-  private def transformStringList(strList: List[String], strAdd: String): List[JValue] =
+  private def transformStringList(strList: List[String], strAdd: String): List[JString] =
     for {
       string <- strList
     } yield {
