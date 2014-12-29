@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2014 Snowplow Analytics Ltd. All rights reserved.
+ * Copyright (c) 2014-2015 Snowplow Analytics Ltd. All rights reserved.
  *
  * This program is licensed to you under the Apache License Version 2.0,
  * and you may not use this file except in compliance with the Apache License Version 2.0.
@@ -27,6 +27,9 @@ import org.json4s.JsonDSL._
 import org.json4s.jackson.JsonMethods._
 import org.json4s.scalaz.JsonScalaz._
 
+// Scala
+import scala.collection.immutable.ListMap
+
 /**
  * Flattens a JsonSchema into Strings representing the path
  * to a field. This will be linked with a Map of attributes
@@ -34,9 +37,12 @@ import org.json4s.scalaz.JsonScalaz._
  */
 object SchemaFlattener {
 
+  // Needed for json4s default extraction formats
+  implicit val formats = DefaultFormats
+
   /**
    * Flattens a JsonSchema into a useable Map of Strings and Attributes.
-   * - Will extract the self-desccribing elements of the JsonSchema out --- TODO
+   * - Will extract the self-describing elements of the JsonSchema out
    * - Will then grab the first properties list and begin the recursive
    *   function
    * - Will then return the validated map of string paths and attributes
@@ -45,57 +51,39 @@ object SchemaFlattener {
    * @return a validated map of keys and attributes or a 
    *         failure string
    */
-  def flattenJsonSchema(jSchema: JValue): Validation[String, Map[String, Map[String,String]]] =
-    jSchema match {
-      case JObject(list) => {
-        attrElemInfo(list) match {
-          case Success(elemProps) => {
-            elemProps.get("object") match {
-              case Some(props) => processProperties(props)
-              case _           => s"Error: Function - 'flattenJsonSchema' - First level of JsonSchema does not contain any properties".fail
-            }
-          }
-          case Failure(str) => str.fail
-        }
-      }
-      case _ => s"Error: Function - 'flattenJsonSchema' - Invalid Schema passed to flattener".fail
-    }
+  def flattenJsonSchema(jSchema: JValue): Validation[String, Map[String, ListMap[String, Map[String,String]]]] =
+    // Grab the self-desc elements from the Schema
+    getSelfDescElems(jSchema) match {
+      case Success(selfElem) => {
 
-  /**
-   * Returns information about a single list element:
-   * - What 'core' type the element is (object,array,other)
-   * - If it is an 'object' returns the properties list for 
-   *   processing
-   *
-   * TODO: Flesh out defining cases for different types of elements
-   *
-   * @param maybeAttrList The list of attributes which need
-   *        to be analysed to determine what to do with them
-   * @return a map which contains a string illustrating what
-   *         what needs to be done with the element
-   */
-  private def attrElemInfo(maybeAttrList: List[(String, JValue)]): Validation[String, Map[String, List[(String, JValue)]]] =
-    maybeAttrList.toMap.get("type") match {
-      case Some(types) => {
-        processType(types) match {
-          case (Success(types)) => {
-            if (types.contains("object")) {
-              maybeAttrList.toMap.get("properties") match {
-                case Some(JObject(props)) => Map("object" -> props).success
-                case _                    => s"Error: Function - 'attrElemInfo' - Object does not have any properties".fail
+        // Match against the Schema and check that it is properly formed: i.e. wrapped in { ... }
+        jSchema match {
+          case JObject(list) => {
+
+            // Analyze the base level of the schema
+            getElemInfo(list) match {
+              case Success(elemProps) => {
+
+                // Assume that the first level will be type object with a valid list of properties
+                elemProps.get("object") match {
+                  case Some(props) => {
+
+                    // If we do have a list of properties then begin the recursuve processing of the list
+                    processProperties(props) match {
+                      case Success(flatElem) => Map("self_elems" -> selfElem, "flat_schema" -> getOrderedPaths(flatElem)).success
+                      case Failure(str) => str.fail
+                    }
+                  }
+                  case _ => s"Error: Function - 'flattenJsonSchema' - JsonSchema does not begin with an 'object' & 'properties'".fail
+                }
               }
-            }
-            else if (types.contains("array")) {
-              Map("array" -> List()).success
-            }
-            else {
-              Map("null" -> List()).success
+              case Failure(str) => str.fail
             }
           }
-          case Failure(str) => str.fail
+          case _ => s"Error: Function - 'flattenJsonSchema' - Invalid Schema passed to flattener".fail
         }
       }
-      case _ => s"Error: Function - 'attrElemInfo' - List does not contain 'Type' field".fail
+      case Failure(str) => str.fail
     }
 
   /**
@@ -117,19 +105,25 @@ object SchemaFlattener {
 
     propertyList match {
       case x :: xs => {
+
         val res = x match {
           case (key, JObject(list)) => {
-            attrElemInfo(list) match {
+
+            getElemInfo(list) match {
               case Success(elemProps) => {
+
                 if (elemProps.contains("object")) {
-                  processProperties(elemProps.get("object").get, Map(), accumKey + key + ".")
+                  elemProps.get("object") match {
+                    case Some(props) => processProperties(props, Map(), accumKey + key + ".")
+                    case _           => s"Error: Function - 'processProperties' - JsonSchema 'object' does not contain any properties, 'getElemInfo' is not catching this anymore".fail
+                  }
                 }
                 else if (elemProps.contains("array")) {
-                  Map(key -> Map("type" -> "array")).success
+                  Map(accumKey + key -> Map("type" -> "array")).success
                 }
                 else {
                   processAttributes(list) match {
-                    case Success(attr) => Map(key -> attr).success
+                    case Success(attr) => Map(accumKey + key -> attr).success
                     case Failure(str)  => str.fail
                   }
                 }
@@ -155,8 +149,6 @@ object SchemaFlattener {
    * This function is aimed at 'final' elements: i.e. cannot
    * be of type 'object' or 'array'.
    *
-   * TODO: Add more cases for different internal attributes to pull (type, format, maxLength etc...)
-   *
    * @param attributes The list of attributes that an element has
    * @param accum The acuumulated Map of String -> String attributes
    * @return a validated map of attributes or a failure string
@@ -165,41 +157,29 @@ object SchemaFlattener {
     attributes match {
       case x :: xs => {
         x match {
-          case (key, JObject(value))       => s"Error: Function - 'processAttributes' - Invalid JValue found".fail
-          case ("type", typeOpt)           => {
-            processType(typeOpt) match {
-              case Success(types) => processAttributes(xs, (accum ++ Map("type" -> types)))
-              case Failure(str)   => str.fail
+          case (key, JArray(value))  => {
+            processList(value) match {
+              case Success(strs) => processAttributes(xs, (accum ++ Map(key -> strs)))
+              case Failure(str) => str.fail
             }
           }
-          case ("format", JString(format)) => processAttributes(xs, (accum ++ Map("format" -> format)))
-          case _                           => processAttributes(xs, (accum ++ Map()))
+          case (key, JBool(value))    => processAttributes(xs, (accum ++ Map(key -> value.toString)))
+          case (key, JInt(value))     => processAttributes(xs, (accum ++ Map(key -> value.toString)))
+          case (key, JDecimal(value)) => processAttributes(xs, (accum ++ Map(key -> value.toString)))
+          case (key, JDouble(value))  => processAttributes(xs, (accum ++ Map(key -> value.toString)))
+          case (key, JNull)           => processAttributes(xs, (accum ++ Map(key -> "null")))
+          case (key, JString(value))  => processAttributes(xs, (accum ++ Map(key -> value)))
+          case _                      => s"Error: Function - 'processAttributes' - Invalid JValue found".fail
         }
       }
       case Nil => accum.success
     }
 
   /**
-   * Process the type field of an element; can be either a String or
-   * an array of Strings.
-   *
-   * @param typeOpt The JValue from the "type" field of an element
-   * @return A validated String containing all of the Type Strings
-   *         combined into one or a failure string
-   */
-  private def processType(typeOpt: JValue): Validation[String, String] =
-    typeOpt match {
-      case (JString(typeOpt)) => typeOpt.success
-      case (JArray(list))     => processTypeList(list)
-      case _                  => s"Error: Function - 'processTypes' - Type Field is invalid".fail
-    }
-
-  /**
    * Takes a list of values and converts them into a single string
    * deliminated by a comma.
    *
-   * TODO: Add validation into Nil Case for odd groupings of
-   *       types eg. (object,string)
+   * TODO: Check if lists of attributes are only strings?
    *
    * Example: List((JString("string")),(JString("null")))
    *          "string,null"
@@ -211,36 +191,111 @@ object SchemaFlattener {
    * @return A validated String containing all entities of the
    *         list that was passed or a failure string
    */ 
-  private def processTypeList(list: List[JValue], accum: String = "", delim: String = ","): Validation[String, String] =
+  private def processList(list: List[JValue], accum: String = "", delim: String = ","): Validation[String, String] =
     list match {
       case x :: xs => {
         x match {
-          case JString(typeOpt) => processTypeList(xs, (accum + delim + typeOpt))
-          case _                => s"Error: Function - 'processTypeList' - Invalid JValue in list".fail
+          case JString(str) => processList(xs, (accum + delim + str))
+          case _            => s"Error: Function - 'processList' - Invalid JValue in list".fail
         }
       }
       case Nil => accum.drop(1).success
     }
 
-  /*
   /**
-    * Will remove any extraneous fields from the schema
-     * which will not be needed in the flattening process.
-    */
-  def stripJsonSchema(jSchema: JValue): Any = {
+   * Attempts to extract the self describing elements of the 
+   * JsonSchema that we are processing.
+   *
+   * @param jSchema the self describing json schema that needs
+   *        to be processed
+   * @return a validated map containing the needed self describing
+   *         elements
+   */
+  private def getSelfDescElems(jSchema: JValue): Validation[String, ListMap[String, Map[String, String]]] = {
+    val vendor  = (jSchema \ "self" \ "vendor").extractOpt[String]
+    val name    = (jSchema \ "self" \ "name").extractOpt[String]
+    val version = (jSchema \ "self" \ "version").extractOpt[String]
 
+    (vendor, name, version) match {
+      case (Some(vendor), Some(name), Some(version)) => ListMap("self" -> Map("vendor" -> vendor, "name" -> name, "version" -> version)).success
+      case (_,_,_) => s"Error: Function - 'getSelfDescElems' - Schema does not contain all needed self describing elements".fail
+    }
+  }
+
+  /**
+   * Returns information about a single list element:
+   * - What 'core' type the element is (object,array,other)
+   * - If it is an 'object' returns the properties list for 
+   *   processing
+   *
+   * @param maybeAttrList The list of attributes which need
+   *        to be analysed to determine what to do with them
+   * @return a map which contains a string illustrating what
+   *         needs to be done with the element
+   */
+  private def getElemInfo(maybeAttrList: List[(String, JValue)]): Validation[String, Map[String, List[(String, JValue)]]] =
+    maybeAttrList.toMap.get("type") match {
+      case Some(types) => {
+        getElemType(types) match {
+          case (Success(elemType)) => {
+            elemType match {
+              case "object" => {
+                maybeAttrList.toMap.get("properties") match {
+                  case Some(JObject(props)) => Map("object" -> props).success
+                  case _ => s"Error: Function - 'getElemInfo' - JsonSchema 'object' does not have any properties".fail
+                }
+              }
+              case "array"  => Map("array" -> List()).success
+              case _        => Map("" -> List()).success // Pass back a successful empty Map for a normal entry (Should come up with something better...)
+            }
+          }
+          case Failure(str) => str.fail
+        }
+      }
+      case _ => s"Error: Function - 'getElemInfo' - List does not contain 'Type' field".fail
+    }
+
+  /**
+   * Process the type field of an element; can be either a String or
+   * an array of Strings.
+   *
+   * TODO: Add validation for odd groupings of
+   *       types eg. (object,string)
+   *
+   * @param types The JValue from the "type" field of an element
+   * @return A validated String which determines what type the element is
+   */
+  private def getElemType(types: JValue): Validation[String, String] = {
+    val maybeTypes = types match {
+      case JString(value) => value.success
+      case JArray(list) => processList(list)
+      case _ => s"Error: Function - 'getElemType' - Type List contains invalid JValue".fail
+    }
+
+    maybeTypes match {
+      case Success(str) => {
+        if (str.contains("object")) {
+          "object".success
+        }
+        else if (str.contains("array")) {
+          "array".success
+        }
+        else {
+          "".success
+        }
+      }
+      case Failure(str) => str.fail
+    }
   }
 
   /**
    * Will organise the paths returned from the flattening
-   * process into the most logical order.
-   * 1. The amount of jumps in the path:
-   *    - Lowest to highest amount
-   * 2. Alphabetical sorting per tier of jumps
+   * process into alphabetical order.
+   *
+   * @param paths The Map of paths that need to be ordered.
+   * @return an ordered ListMap of paths that are now in
+   *         alphabetical order.
    */
-  def orderFlattenedPaths(paths: List[String]): Any = {
-
-  }
-  */
+  private def getOrderedPaths(paths: Map[String, Map[String, String]]): ListMap[String, Map[String, String]] =
+    ListMap(paths.toSeq.sortBy(_._1):_*)
 }
-
