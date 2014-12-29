@@ -70,7 +70,7 @@ object SchemaFlattener {
 
                     // If we do have a list of properties then begin the recursuve processing of the list
                     processProperties(props) match {
-                      case Success(flatElem) => Map("self_elems" -> selfElem, "flat_schema" -> getOrderedPaths(flatElem)).success
+                      case Success(flatElem) => Map("self_elems" -> selfElem, "flat_elems" -> getOrderedPaths(flatElem)).success
                       case Failure(str) => str.fail
                     }
                   }
