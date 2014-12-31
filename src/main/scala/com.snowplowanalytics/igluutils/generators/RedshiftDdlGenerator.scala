@@ -34,8 +34,8 @@ import org.json4s.scalaz.JsonScalaz._
 import scala.collection.immutable.ListMap
 
 /**
- * Generates a Redshift DDL File from a Map
- * of Keys -> Attributes pulled from a JsonSchema
+ * Generates a Redshift DDL File from a Flattened
+ * JsonSchema
  */
 object RedshiftDdlGenerator {
 
@@ -99,19 +99,19 @@ object RedshiftDdlGenerator {
 
   /**
    * Generates a Redshift DDL File from a flattened 
-   * JsonSchema.
+   * JsonSchema
    *
    * @param flatSchema The Map produced by the Schema
    *        flattening process
    * @return a list of strings which contains every line
-   *         in a Redshift DDL file
+   *         in a Redshift DDL file or a Failure String
    */
   def getRedshiftDdlFile(flatSchema: Map[String, ListMap[String, Map[String,String]]]): Validation[String, List[String]] = {
 
-    // Process the properties of the flattened schema...
-    val properties = flatSchema.get("flat_elems") match {
+    // Process the data fields of the flattened schema...
+    val data = flatSchema.get("flat_elems") match {
       case Some(elems) => {
-        processProperties(elems).success
+        processData(elems).success
       }
       case None => s"Error: Function - `getRedshiftDdlFile` - Should never happen; check the key used to store the fields in SchemaFlattener".fail
     }
@@ -125,7 +125,7 @@ object RedshiftDdlGenerator {
     }
 
     // Process the new lists...
-    (properties, selfDesc) match {
+    (data, selfDesc) match {
       case (Success(a), Success(b)) => (RedshiftDdlDefaultHeader ++ a ++ RedshiftDdlDefaultTables ++ b ++ RedshiftDdlDefaultEnd).success
       case (Failure(a), Failure(b)) => (a + "," + b).fail
       case (Failure(str), _) => str.fail
@@ -134,11 +134,11 @@ object RedshiftDdlGenerator {
   }
 
   /**
-   * Creates the Redshift Table Name and compatibility string
+   * Creates the Redshift Table Name and compatibility strings
    * for the Redshift DDL File.
    *
-   * @param flatSelfElems The Map of Self Describing Elements
-   *        to process.
+   * @param flatSelfElems A Map of Self Describing elements
+   *        pulled from the JsonSchema
    * @return a validated list of strings that contain the 
    *         relevant information
    */
@@ -154,7 +154,6 @@ object RedshiftDdlGenerator {
 
             // Create variables needed from self-desc information
             val compat = "iglu:"+vendor+"/"+name+"/jsonschema/"+version
-
             SU.schemaToRedshift(compat) match {
               case Success(str) => {
                 List(
@@ -174,19 +173,24 @@ object RedshiftDdlGenerator {
   }
 
   /**
-   * Processes the list of Schema Elements and assigns how
-   * each field should be encoded.
+   * Processes the Map of Data elements pulled from
+   * the JsonSchema and figures out how each one should
+   * be processed based on attributes associated with it.
+   *
+   * eg. ts -> Map("type" -> "string", "format" -> "date-time")
+   *     ts timestamp encode raw
    *
    * TODO: Add further analysis here to determine more abstract fields
    *
-   * @param flatSchemaElems The Map of Schema keys -> attributes
-   *        which need to be processed.
-   * @return a list of strings which contain each schema key
-   *         and an understanding of what to do with it.
+   * @param flatDataElems The Map of Schema keys -> attributes
+   *        which need to be processed
+   * @return an itterable list of strings which contain each 
+   *         key and an encoding/storage rule for the data that
+   *         will come with it
    */
-  private def processProperties(flatSchemaElems: ListMap[String, Map[String, String]]): Iterable[String] = {
+  private def processData(flatDataElems: ListMap[String, Map[String, String]]): Iterable[String] =
     for {
-     (key, value) <- flatSchemaElems
+     (key, value) <- flatDataElems
     } yield {
       ("\"" + key + "\"" + " " + (value match {
         case attr => {
@@ -212,22 +216,27 @@ object RedshiftDdlGenerator {
         }
       }))
     }
-  }
 
   /**
-   * Formats the list of properties and tables to have the
-   * correct amount of white-space per line.
+   * Formats the new fields to have the correct 
+   * amount of white-space per line.
    *
-   * @param properties The list of properties which need
+   * eg. ts timestamp encode raw,
+   *     data.ts timestamp encode raw,
+   * ->
+   *     ts      timestamp encode raw,
+   *     data.ts timestamp encode raw,
+   *
+   * @param data The list of fields which need
    *        to be formatted
    * @return a list of strings which has the correct
    *         amount of white-space
    */
-  private def formatPropertiesList(properties: Iterable[String]): Iterable[String] = {
+  private def formatPropertiesList(data: Iterable[String]): Iterable[String] = {
 
     // Get the longest string in the list to use as a measure
     val maxLen = SU.getLongest(for {
-        field <- properties
+        field <- data
       } yield {
         field.split(" ")(0)
       }).size
@@ -236,7 +245,7 @@ object RedshiftDdlGenerator {
 
     // Process each string and add white-space according to calculated maxLen
     for {
-      field <- properties
+      field <- data
     } yield {
 
       // Get the length of the key...
