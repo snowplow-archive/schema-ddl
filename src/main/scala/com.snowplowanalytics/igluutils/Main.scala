@@ -19,6 +19,11 @@ import generators.{
   SchemaFlattener      => SF
 }
 
+// Utilities
+import utils.{
+  FileUtils => FU
+}
+
 // Scalaz
 import scalaz._
 import Scalaz._
@@ -35,48 +40,47 @@ import org.json4s.scalaz.JsonScalaz._
 
 object Main {
 
-  // TODO: remove folder hardcoding
-  private val PathToRoot = "//vagrant//Github//iglu-utils//src//test//resources//"
-
   def main(args: Array[String]) {
 
-    val returned = getSchemaFromFolder(PathToRoot).toList
-
-    val successes = for {
-      Success(json) <- returned
-    } yield {
-      SF.flattenJsonSchema(json)
+    if (args.size == 0) {
+      println("No arguments passed to function!")
+      exit(1)
     }
+    
+    // Get the path to the json schema...
+    val path = args(0)
 
-    println(successes)
-  }
+    // Fetch and parse the JSON...
+    FU.getJsonFromPath(path) match {
+      case Success(json) => {
+        SF.flattenJsonSchema(json) match {
+          case Success(flatSchema) => {
+            val jpf = JPG.getJsonPathsFile(flatSchema)
+            val rdf = RDG.getRedshiftDdlFile(flatSchema)
 
-  /**
-   * Returns a validated List of Json Schemas from the folder it was
-   * pointed at.
-   *
-   * @param dir The directory we are going to get Schemas from
-   * @param ext The extension of the files we are going to be
-   *        attempting to grab
-   * @return an Array with validated JSONs nested inside
-   */
-  private def getSchemaFromFolder(dir: String, ext: String = "json"): Array[Validation[String, JValue]] =
-    for {
-      filePath <- new java.io.File(dir).listFiles.filter(_.getName.endsWith("." + ext))
-    } yield {
-      try {
-        val file = scala.io.Source.fromFile(filePath)
-        val content = file.mkString
-        parse(content).success
-      } catch {
-        case e: JsonParseException => {
-          val exception = e.toString
-          s"File [$filePath] contents failed to parse into JSON: [$exception]".fail
-        }
-        case e: Exception => {
-          val exception = e.toString
-          s"File [$filePath] fetching and parsing failed: [$exception]".fail
+            (jpf, rdf) match {
+              case (Success(jp), Success(rd)) => {
+                jp.foreach {println}
+                rd.foreach {println}
+
+                println("Success")
+                exit(0)
+              }
+              case (Failure(a), Failure(b)) => println(a + "," + b); exit(1)
+              case (Failure(a), _)        => println(a); exit(1)
+              case (_, Failure(b))        => println(b); exit(1)
+            }
+          }
+          case Failure(str) => {
+            println(str)
+            exit(1)
+          }
         }
       }
+      case Failure(str) => {
+        println(str)
+        exit(1)
+      }
     }
+  }
 }
