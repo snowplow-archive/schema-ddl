@@ -111,7 +111,7 @@ object RedshiftDdlGenerator {
     // Process the data fields of the flattened schema...
     val data = flatSchema.get("flat_elems") match {
       case Some(elems) => {
-        processData(elems).success
+        formatPropertiesList(processData(elems)).success
       }
       case None => s"Error: Function - `getRedshiftDdlFile` - Should never happen; check the key used to store the fields in SchemaFlattener".fail
     }
@@ -125,7 +125,7 @@ object RedshiftDdlGenerator {
     }
 
     // Process the new lists...
-    (data, selfDesc) match {
+    (selfDesc, data) match {
       case (Success(a), Success(b)) => (RedshiftDdlDefaultHeader ++ a ++ RedshiftDdlDefaultTables ++ b ++ RedshiftDdlDefaultEnd).success
       case (Failure(a), Failure(b)) => (a + "," + b).fail
       case (Failure(str), _) => str.fail
