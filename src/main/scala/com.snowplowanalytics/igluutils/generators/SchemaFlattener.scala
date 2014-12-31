@@ -13,6 +13,9 @@
 package com.snowplowanalytics.igluutils
 package generators
 
+// Utils
+import utils.{MapUtils => MU}
+
 // Scalaz
 import scalaz._
 import Scalaz._
@@ -70,7 +73,7 @@ object SchemaFlattener {
 
                     // If we do have a list of properties then begin the recursuve processing of the list
                     processProperties(props) match {
-                      case Success(flatElem) => Map("self_elems" -> selfElem, "flat_elems" -> getOrderedPaths(flatElem)).success
+                      case Success(flatElem) => Map("self_elems" -> selfElem, "flat_elems" -> MU.getOrderedMap(flatElem)).success
                       case Failure(str) => str.fail
                     }
                   }
@@ -287,15 +290,4 @@ object SchemaFlattener {
       case Failure(str) => str.fail
     }
   }
-
-  /**
-   * Will organise the paths returned from the flattening
-   * process into alphabetical order.
-   *
-   * @param paths The Map of paths that need to be ordered.
-   * @return an ordered ListMap of paths that are now in
-   *         alphabetical order.
-   */
-  private def getOrderedPaths(paths: Map[String, Map[String, String]]): ListMap[String, Map[String, String]] =
-    ListMap(paths.toSeq.sortBy(_._1):_*)
 }
