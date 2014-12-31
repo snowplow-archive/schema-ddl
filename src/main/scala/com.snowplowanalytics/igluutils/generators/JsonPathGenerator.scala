@@ -59,17 +59,26 @@ object JsonPathGenerator {
     "refParent"
   )
 
+  private val JsonPathFileHeader = List(
+    "{",
+    "    \"jsonpaths\": ["
+  )
+
+  private val JsonPathFileFooter = List(
+    "    ]",
+    "}"
+  )
+
   /**
    * Returns a validated JsonPath file based on the default
    * fields provided and the flattened schema.
    *
-   * @param flatSchema A flattened schema containing all
-   *        the paths that need to be added for the data
-   *        fields
+   * @param flatSchema The Map produced by the Schema flattening 
+   *        process
    * @return a JsonPath String containing all of the relevant
-   *         fields or a Failure string
+   *         fields in a Json valid format or a Failure string
    */
-  def getJsonPathsFile(flatSchema: Map[String, ListMap[String, Map[String,String]]]): Validation[String, String] = {
+  def getJsonPathsFile(flatSchema: Map[String, ListMap[String, Map[String,String]]]): Validation[String, List[String]] = {
 
     // Append a Prefix to all of the fields
     val schemaFieldList = SU.appendToStrings(JsonPathSchemaFields, JsonPathPrefix.Schema)
@@ -79,14 +88,27 @@ object JsonPathGenerator {
       case None => s"Error: Function - `getJsonPathFile` - Should never happen; check the key used to store the fields in SchemaFlattener".fail
     }
 
-    // Combine all of the lists into one and return...
+    // Combine the lists together...
     dataFieldList match {
-      case (Success(data)) => {
-        pretty {
-          ("jsonpaths" -> (((schemaFieldList ++ hierarchyFieldList ++ data))) )
-        }.success
-      }
+      case (Success(data)) => (JsonPathFileHeader ++ formatFields(schemaFieldList ++ hierarchyFieldList ++ data) ++ JsonPathFileFooter).success
       case (Failure(str)) => str.fail
+    }
+  }
+
+  /**
+   * Adds whitespace to the front of each string
+   * in the list for formatting purposes.
+   *
+   * @param fields The fields that need to have 
+   *        white space added
+   * @return the formatted fields
+   */
+  private def formatFields(fields: List[String]): List[String] = {
+    val whiteSpace = SU.getWhiteSpace(8)
+    for {
+      field <- fields
+    } yield {
+      whiteSpace + field
     }
   }
 }
