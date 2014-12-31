@@ -78,7 +78,30 @@ object FileUtils {
   }
 
   /**
-   * Returns a validated Array of Json's from the folder it was
+   * Returns a validated JSON Instance which was read
+   * from a file.
+   *
+   * @param file The file to extract the JSON from
+   * @return a validated JSON or a Failure String
+   */
+  private def fileToJson(file: File): Validation[String, JValue] =
+    try {
+      val fileSource = scala.io.Source.fromFile(file)
+      val content = fileSource.mkString
+      parse(content).success
+    } catch {
+      case e: JsonParseException => {
+        val exception = e.toString
+        s"File [$file] contents failed to parse into JSON: [$exception]".fail
+      }
+      case e: Exception => {
+        val exception = e.toString
+        s"File [$file] fetching and parsing failed: [$exception]".fail
+      }
+    }
+
+  /**
+   * Returns a validated Array of JSON Instances from the folder it was
    * pointed at.
    *
    * @param dir The directory we are going to get Json's from
@@ -86,23 +109,28 @@ object FileUtils {
    *        attempting to grab
    * @return a validated array of Json's or a failure string
    */
-  def getJsonFromDir(dir: String, ext: String = "json"): Array[Validation[String, JValue]] =
+  def getJsonFromDir(dir: String, ext: String = "json"): List[Validation[String, JValue]] =
     for {
-      filePath <- new File(dir).listFiles.filter(_.getName.endsWith("." + ext))
+      file <- new File(dir).listFiles.filter(_.getName.endsWith("." + ext)).toList
     } yield {
-      try {
-        val file = scala.io.Source.fromFile(filePath)
-        val content = file.mkString
-        parse(content).success
-      } catch {
-        case e: JsonParseException => {
-          val exception = e.toString
-          s"File [$filePath] contents failed to parse into JSON: [$exception]".fail
-        }
-        case e: Exception => {
-          val exception = e.toString
-          s"File [$filePath] fetching and parsing failed: [$exception]".fail
-        }
+      fileToJson(file)
+    }
+
+  /**
+   * Returns a validated JSON Instance which was read
+   * from a file path.
+   *
+   * @param path The path to the file we want to consume
+   * @return a validated JSON or a Failure String
+   */
+  def getJsonFromPath(path: String): Validation[String, JValue] = 
+    try {
+      val file = new File(path)
+      fileToJson(file)
+    } catch {
+      case e: Exception => {
+        val exception = e.toString
+        "File [$file] fetching failed: [$exception]".fail
       }
     }
 }
