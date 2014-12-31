@@ -50,20 +50,60 @@ object StringUtils {
     ("").padTo(count, ' ')
 
   /**
-   * Appends a Prefix to a String
+   * Prepends a Prefix to a String
    *
-   * @param strings The list of strings to be converted to
-   *        JStrings
-   * @param prefix The string to be appended to the start
+   * @param strings The list of strings to be prepended
+   * @param prefix The string to be prepended to the start
    *        of each string
    * @return the List of converted Strings
    */
-  def appendToStrings(strings: List[String], prefix: String): List[String] =
+  def prependStrings(strings: List[String], prefix: String): List[String] =
     for {
       string <- strings
     } yield {
       prefix + string
     }
+
+  /**
+   * Appends a Suffix to a String
+   *
+   * @param strings The list of strings to be appended
+   * @param suffix The string to be appended to the end
+   *        of each string
+   * @return the List of converted Strings
+   */
+  def appendStrings(strings: List[String], suffix: String): List[String] =
+    for {
+      string <- strings
+    } yield {
+      string + suffix
+    }
+
+  /**
+   * Calculates whether or not the string passed is the
+   * last string of a list.
+   *
+   * @param list The list of strings that need to 
+   *        be tested
+   * @param test The test string which needs to 
+   *        be assessed
+   * @return a boolean stating whether or not it is
+   *         the last string 
+   */
+  def isLast(list: List[String], test: String): Boolean =
+    if (list.last == test) true else false
+
+  /**
+   * Builds a Schema name from variables.
+   * 
+   * @param vendor The vendor of the schema
+   * @param name The name of the event the 
+   *        schema describes
+   * @param version The version of the schema
+   * @return a valid schema name
+   */
+  def getSchemaName(vendor: String, name: String, version: String): String =
+    "iglu:"+vendor+"/"+name+"/jsonschema/"+version
 
   /**
    * Create a Redshift Table name from a schema
