@@ -40,10 +40,11 @@ import scala.collection.immutable.ListMap
 object RedshiftDdlGenerator {
 
   // Encoding Options for the different fields
+  // TODO: Add more encoding options
   private object TableEncodeOptions {
-    val Array    = "varchar(5000)  encode runlength, -- Holds a JSON array"
-    val DateTime = "timestamp      encode raw,"
-    val Generic  = "varchar(255)   encode raw,"
+    val Array    = "varchar(5000)  encode runlength"
+    val DateTime = "timestamp      encode raw"
+    val Generic  = "varchar(255)   encode raw"
   }
 
   // Settings for the header of the file
@@ -93,8 +94,7 @@ object RedshiftDdlGenerator {
     "DISTSTYLE KEY",
     "-- Optimized join to atomic.events",
     "DISTKEY (root_id)",
-    "SORTKEY (root_tstamp);",
-    ""
+    "SORTKEY (root_tstamp);"
   )
 
   /**
@@ -110,26 +110,22 @@ object RedshiftDdlGenerator {
 
     // Process the data fields of the flattened schema...
     val data = flatSchema.get("flat_elems") match {
-      case Some(elems) => {
-        formatPropertiesList(processData(elems)).success
-      }
-      case None => s"Error: Function - `getRedshiftDdlFile` - Should never happen; check the key used to store the fields in SchemaFlattener".fail
+      case Some(elems) => processData(elems).success
+      case None        => s"Error: Function - `getRedshiftDdlFile` - Should never happen; check the key used to store the fields in SchemaFlattener".fail
     }
 
-    // Process the self describing elements of the flattened schema...
+    // Process the self describing fields of the flattened schema...
     val selfDesc = flatSchema.get("self_elems") match {
-      case Some(elems) => {
-        processSelfDesc(elems)
-      }
-      case None => s"Error: Function - `getRedshiftDdlFile` - Should never happen; check the key used to store the self describing elements in SchemaFlattener".fail
+      case Some(elems) => processSelfDesc(elems)
+      case None        => s"Error: Function - `getRedshiftDdlFile` - Should never happen; check the key used to store the self describing elements in SchemaFlattener".fail
     }
 
     // Process the new lists...
     (selfDesc, data) match {
       case (Success(a), Success(b)) => (RedshiftDdlDefaultHeader ++ a ++ RedshiftDdlDefaultTables ++ b ++ RedshiftDdlDefaultEnd).success
       case (Failure(a), Failure(b)) => (a + "," + b).fail
-      case (Failure(str), _) => str.fail
-      case (_, Failure(str)) => str.fail
+      case (Failure(str),        _) => str.fail
+      case (_,        Failure(str)) => str.fail
     }
   }
 
@@ -139,27 +135,30 @@ object RedshiftDdlGenerator {
    *
    * @param flatSelfElems A Map of Self Describing elements
    *        pulled from the JsonSchema
-   * @return a validated list of strings that contain the 
+   * @return a validated list of strings that contain the
    *         relevant information
    */
-  private def processSelfDesc(flatSelfElems: ListMap[String, Map[String, String]]): Validation[String, List[String]] = {
+  private def processSelfDesc(flatSelfElems: ListMap[String, Map[String, String]]): Validation[String, List[String]] =
     flatSelfElems.get("self") match {
       case Some(values) => {
-        val vendor = values.get("vendor")
-        val name = values.get("name")
+
+        val vendor  = values.get("vendor")
+        val name    = values.get("name")
         val version = values.get("version")
 
         (vendor, name, version) match {
-          case (Some(vendor), Some(name), Some(version)) => {
+          case (Some(a), Some(b), Some(c)) => {
 
-            // Create variables needed from self-desc information
-            val compat = "iglu:"+vendor+"/"+name+"/jsonschema/"+version
-            SU.schemaToRedshift(compat) match {
-              case Success(str) => {
+            // Make a schema name from the variables
+            val schemaName = SU.getSchemaName(a, b, c)
+
+            // If the schema name -> redshift name is a success...
+            SU.schemaToRedshift(schemaName) match {
+              case Success(tableName) => {
                 List(
-                  ("-- Compatibility: "+compat+""),
+                  ("-- Compatibility: "+schemaName+""),
                   (""),
-                  ("CREATE TABLE atomic."+str+" (")
+                  ("CREATE TABLE atomic."+tableName+" (")
                 ).success
               }
               case Failure(str) => str.fail
@@ -169,8 +168,7 @@ object RedshiftDdlGenerator {
         }
       }
       case None => s"Error: Function - `processSelfDesc` - Should never happen; Information missing cannot process".fail
-    } 
-  }
+    }
 
   /**
    * Processes the Map of Data elements pulled from
@@ -180,82 +178,62 @@ object RedshiftDdlGenerator {
    * eg. ts -> Map("type" -> "string", "format" -> "date-time")
    *     ts timestamp encode raw
    *
-   * TODO: Add further analysis here to determine more abstract fields
-   *
    * @param flatDataElems The Map of Schema keys -> attributes
    *        which need to be processed
    * @return an itterable list of strings which contain each 
    *         key and an encoding/storage rule for the data that
    *         will come with it
    */
-  private def processData(flatDataElems: ListMap[String, Map[String, String]]): Iterable[String] =
+  private def processData(flatDataElems: ListMap[String, Map[String, String]]): Iterable[String] = {
+    // Get the size of the longest key in the map
+    val keys = flatDataElems.keys.toList
+    val maxLen = SU.getLongest(keys).size
+
+    // Process each key pair in the map
     for {
-     (key, value) <- flatDataElems
+     (k, v) <- flatDataElems
     } yield {
-      ("\"" + key + "\"" + " " + (value match {
-        case attr => {
-          (attr.get("type"), attr.get("format")) match {
-            case (Some(types), Some(format)) => {
-              if (types.contains("string") && format == "date-time") {
-                TableEncodeOptions.DateTime
-              }
-              else {
-                TableEncodeOptions.Generic
-              }
-            }
-            case (Some(types), _) => {
-              if (types.contains("array")) {
-                TableEncodeOptions.Array
-              }
-              else {
-                TableEncodeOptions.Generic
-              }
-            }
-            case (_, _) => TableEncodeOptions.Generic
-          }
-        }
-      }))
-    }
+      val prefix = SU.getWhiteSpace(4) // Essentially a tab
+      val key    = "\"" + k + "\"" // Wrap the key to prevent odd chars from breaking the table
+      val space  = SU.getWhiteSpace(maxLen - k.size + 1) // Get the space needed to neatly format the file
+      val encode = getEncodeType(v) // Using the value figure out how the keys vaues should get encoded
+      val suffix = if (SU.isLast(keys, k)) "" else "," // If this is the last key we cannot have a comma as a suffix
 
-  /**
-   * Formats the new fields to have the correct 
-   * amount of white-space per line.
-   *
-   * eg. ts timestamp encode raw,
-   *     data.ts timestamp encode raw,
-   * ->
-   *     ts      timestamp encode raw,
-   *     data.ts timestamp encode raw,
-   *
-   * @param data The list of fields which need
-   *        to be formatted
-   * @return a list of strings which has the correct
-   *         amount of white-space
-   */
-  private def formatPropertiesList(data: Iterable[String]): Iterable[String] = {
-
-    // Get the longest string in the list to use as a measure
-    val maxLen = SU.getLongest(for {
-        field <- data
-      } yield {
-        field.split(" ")(0)
-      }).size
-
-    val tab = SU.getWhiteSpace(4)
-
-    // Process each string and add white-space according to calculated maxLen
-    for {
-      field <- data
-    } yield {
-
-      // Get the length of the key...
-      val keyLen = field.split(" ")(0).size
-      if (keyLen < maxLen) {
-        tab.concat(field.replaceFirst(" ", SU.getWhiteSpace(maxLen - (keyLen - 1))))
-      }
-      else {
-        tab.concat(field)
-      }
+      // Return compiled string...
+      prefix + key + space + encode + suffix
     }
   }
+
+  /**
+   * Returns the encode type based on what attrbutes
+   * are contained within the providied map.
+   *
+   * @param attrs The map to be analyzeds
+   * @return the encode type as a String
+   */
+   //TODO: Flesh out definitions for encode types based on attributes
+  private def getEncodeType(attrs: Map[String, String]): String =
+    attrs match {
+      case map => {
+        (map.get("type"), map.get("format")) match {
+          case (Some(types), Some(format)) => {
+            if (types.contains("string") && format == "date-time") {
+              TableEncodeOptions.DateTime
+            }
+            else {
+              TableEncodeOptions.Generic
+            }
+          }
+          case (Some(types), _) => {
+            if (types.contains("array")) {
+              TableEncodeOptions.Array
+            }
+            else {
+              TableEncodeOptions.Generic
+            }
+          }
+          case (_, _) => TableEncodeOptions.Generic
+        }
+      }
+    }
 }
