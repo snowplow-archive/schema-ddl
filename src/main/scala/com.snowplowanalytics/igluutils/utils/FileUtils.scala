@@ -51,16 +51,22 @@ object FileUtils {
    */
   def writeListToFile(fileName: String, fileDir: String, list: List[String]): Validation[String, String] =
     try {
-      // Attempt to open the file...
-      val file = new File(fileDir + fileName)
+      makeDir(fileDir) match {
+        case true  => {
+          // Attempt to open the file...
+          val file = new File(fileDir + fileName)
 
-      // Print the contents of the list to the new file...
-      printToFile(file) { p =>
-        list.foreach(p.println)
+          // Print the contents of the list to the new file...
+          printToFile(file) { p =>
+            list.foreach(p.println)
+          }
+
+          // Output a success message
+          s"File [${fileDir}${fileName}] was written successfully!".success
+        }
+        case false => s"Could not make new directory to store files in - Check write permissions".fail
       }
-      s"File [${fileDir}${fileName}] was written successfully!".success
-    } 
-    catch {
+    } catch {
       case e: Exception => {
         val exception = e.toString
         s"File [${fileDir}${fileName}] failed to write: [$exception]".fail
@@ -75,6 +81,24 @@ object FileUtils {
   private def printToFile(f: File)(op: PrintWriter => Unit) {
     val p = new PrintWriter(f)
     try { op(p) } finally { p.close() }
+  }
+
+  /**
+   * Creates a new directory at the path
+   * specified and returns a boolean on
+   * if it was successful.
+   *
+   * @param dir The path that needs to be
+   *        created
+   * @return a boolean of direcroty creation
+   *         success
+   */
+  def makeDir(dir: String): Boolean = {
+    val file = new File(dir)
+    if (!file.exists()) {
+      file.mkdirs
+    }
+    true
   }
 
   /**
