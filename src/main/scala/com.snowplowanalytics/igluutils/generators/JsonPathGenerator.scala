@@ -13,6 +13,9 @@
 package com.snowplowanalytics.igluutils
 package generators
 
+// Utils
+import utils.{StringUtils => SU}
+
 // Scalaz
 import scalaz._
 import Scalaz._
@@ -57,48 +60,33 @@ object JsonPathGenerator {
   )
 
   /**
-   * Returns a valid JsonPath file based on the default
+   * Returns a validated JsonPath file based on the default
    * fields provided and the flattened schema.
    *
    * @param flatSchema A flattened schema containing all
    *        the paths that need to be added for the data
    *        fields
-   * @return a JsonPath containing all of the relevant
-   *         fields
+   * @return a JsonPath String containing all of the relevant
+   *         fields or a Failure string
    */
-  def getJsonPathsFile(flatSchema: Map[String, ListMap[String, Map[String,String]]]): JValue = {
+  def getJsonPathsFile(flatSchema: Map[String, ListMap[String, Map[String,String]]]): Validation[String, String] = {
 
-    // Convert all of the field lists to lists of JStrings
-    val schemaFieldList = transformStringList(JsonPathSchemaFields, JsonPathPrefix.Schema)
-    val hierarchyFieldList = transformStringList(JsonPathHierarchyFields, JsonPathPrefix.Hierarchy)
+    // Append a Prefix to all of the fields
+    val schemaFieldList = SU.appendToStrings(JsonPathSchemaFields, JsonPathPrefix.Schema)
+    val hierarchyFieldList = SU.appendToStrings(JsonPathHierarchyFields, JsonPathPrefix.Hierarchy)
     val dataFieldList = flatSchema.get("flat_elems") match {
-      case Some(elems) => transformStringList(elems.keys.toList, JsonPathPrefix.Data)
-      case None => List()
+      case Some(elems) => SU.appendToStrings(elems.keys.toList, JsonPathPrefix.Data).success
+      case None => s"Error: Function - `getJsonPathFile` - Should never happen; check the key used to store the fields in SchemaFlattener".fail
     }
 
-    // Combine all of the lists into one
-    val fieldList = schemaFieldList ++ hierarchyFieldList ++ dataFieldList
-
-    // Generate the JsonPath Json
-    compact {
-      ("jsonpaths" -> (( fieldList )) )
+    // Combine all of the lists into one and return...
+    dataFieldList match {
+      case (Success(data)) => {
+        pretty {
+          ("jsonpaths" -> (((schemaFieldList ++ hierarchyFieldList ++ data))) )
+        }.success
+      }
+      case (Failure(str)) => str.fail
     }
   }
-
-  /**
-   * Transforms a list of strings into a list of JStrings
-   * which can be nested into a JArray JValue.
-   *
-   * @param strList The list of strings to be converted to
-   *        JStrings
-   * @param strAdd The string to be appended to the start
-   *        of each string
-   * @return the List of converted Strings
-   */
-  private def transformStringList(strList: List[String], strAdd: String): List[JString] =
-    for {
-      string <- strList
-    } yield {
-      JString(strAdd + string)
-    }
 }
