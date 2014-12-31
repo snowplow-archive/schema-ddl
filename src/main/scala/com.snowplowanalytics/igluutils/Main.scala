@@ -21,7 +21,8 @@ import generators.{
 
 // Utilities
 import utils.{
-  FileUtils => FU
+  FileUtils   => FU,
+  StringUtils => SU
 }
 
 // Scalaz
@@ -38,8 +39,12 @@ import org.json4s.JsonDSL._
 import org.json4s.jackson.JsonMethods._
 import org.json4s.scalaz.JsonScalaz._
 
+// Scala
+import scala.collection.immutable.ListMap
+
 object Main {
 
+  // TODO: Abstract what this function is doing into many functions
   def main(args: Array[String]) {
 
     if (args.size == 0) {
@@ -53,22 +58,35 @@ object Main {
     // Fetch and parse the JSON...
     FU.getJsonFromPath(path) match {
       case Success(json) => {
+
+        // Flatten the JsonSchema
         SF.flattenJsonSchema(json) match {
           case Success(flatSchema) => {
+
+            // Get the JsonPath and Redshift Files
             val jpf = JPG.getJsonPathsFile(flatSchema)
             val rdf = RDG.getRedshiftDdlFile(flatSchema)
 
-            (jpf, rdf) match {
-              case (Success(jp), Success(rd)) => {
-                jp.foreach {println}
-                rd.foreach {println}
+            // Get the vendor/fileName -> com.mailchimp/subscribe_1 
+            val combined = getFileName(flatSchema.get("self_elems").get)
+            
+            (jpf, rdf, combined) match {
+              case (Success(jp), Success(rd), Success(name)) => {
 
-                println("Success")
+                val vendor = name.split("/")(0)
+                val file   = name.split("/")(1)
+
+                val jsonPathDir = "/vagrant/iglu-utils-test/jsonpaths/" + vendor + "/"
+                val redshiftDir = "/vagrant/iglu-utils-test/sql/" + vendor + "/"
+
+                println(FU.writeListToFile(file + ".json", jsonPathDir, jp))
+                println(FU.writeListToFile(file + ".sql", redshiftDir, rd))
                 exit(0)
               }
-              case (Failure(a), Failure(b)) => println(a + "," + b); exit(1)
-              case (Failure(a), _)        => println(a); exit(1)
-              case (_, Failure(b))        => println(b); exit(1)
+              case (Failure(a), Failure(b), Failure(c)) => println(a + "," + b + "," + c); exit(1)
+              case (Failure(a),          _,          _) => println(a); exit(1)
+              case (         _, Failure(b),          _) => println(b); exit(1)
+              case (         _,          _, Failure(c)) => println(c); exit(1)
             }
           }
           case Failure(str) => {
@@ -83,4 +101,25 @@ object Main {
       }
     }
   }
+
+  // TODO: Move this somewhere more appropriate
+  private def getFileName(flatSelfElems: ListMap[String, Map[String, String]]): Validation[String, String] =
+    flatSelfElems.get("self") match {
+      case Some(values) => {
+        val vendor = values.get("vendor")
+        val name   = values.get("name")
+
+        (vendor, name) match {
+          case (Some(vendor), Some(name)) => {
+            // Make the file name
+            val file = name.replaceAll("([^A-Z_])([A-Z])", "$1_$2").toLowerCase.concat("_1")
+
+            // Return the vendor and the file name together
+            (vendor + "/" + file).success
+          }
+          case (_, _) => s"Error: Function - `getFileName` - Should never happen; SchemaFlattener is not catching self-desc information missing".fail
+        }
+      }
+      case None => s"Error: Function - `getFileName` - Should never happen; SchemaFlattener is not catching self-desc information missing".fail
+    }
 }
