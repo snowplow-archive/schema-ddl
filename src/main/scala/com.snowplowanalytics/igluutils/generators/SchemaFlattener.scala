@@ -221,7 +221,7 @@ object SchemaFlattener {
 
     (vendor, name, version) match {
       case (Some(vendor), Some(name), Some(version)) => ListMap("self" -> Map("vendor" -> vendor, "name" -> name, "version" -> version)).success
-      case (_,_,_) => s"Error: Function - 'getSelfDescElems' - Schema does not contain all needed self describing elements".fail
+      case (_, _, _) => s"Error: Function - 'getSelfDescElems' - Schema does not contain all needed self describing elements".fail
     }
   }
 
