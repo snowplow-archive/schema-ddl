@@ -81,17 +81,17 @@ object JsonPathGenerator {
   def getJsonPathsFile(flatSchema: Map[String, ListMap[String, Map[String,String]]]): Validation[String, List[String]] = {
 
     // Append a Prefix to all of the fields
-    val schemaFieldList = SU.appendToStrings(JsonPathSchemaFields, JsonPathPrefix.Schema)
-    val hierarchyFieldList = SU.appendToStrings(JsonPathHierarchyFields, JsonPathPrefix.Hierarchy)
-    val dataFieldList = flatSchema.get("flat_elems") match {
-      case Some(elems) => SU.appendToStrings(elems.keys.toList, JsonPathPrefix.Data).success
-      case None => s"Error: Function - `getJsonPathFile` - Should never happen; check the key used to store the fields in SchemaFlattener".fail
+    val schemaFieldList    = SU.prependStrings(JsonPathSchemaFields, JsonPathPrefix.Schema)
+    val hierarchyFieldList = SU.prependStrings(JsonPathHierarchyFields, JsonPathPrefix.Hierarchy)
+    val dataFieldList      = flatSchema.get("flat_elems") match {
+      case Some(elems) => SU.prependStrings(elems.keys.toList, JsonPathPrefix.Data).success
+      case None        => s"Error: Function - `getJsonPathFile` - Should never happen; check the key used to store the fields in SchemaFlattener".fail
     }
 
     // Combine the lists together...
     dataFieldList match {
       case (Success(data)) => (JsonPathFileHeader ++ formatFields(schemaFieldList ++ hierarchyFieldList ++ data) ++ JsonPathFileFooter).success
-      case (Failure(str)) => str.fail
+      case (Failure(str))  => str.fail
     }
   }
 
@@ -104,11 +104,12 @@ object JsonPathGenerator {
    * @return the formatted fields
    */
   private def formatFields(fields: List[String]): List[String] = {
-    val whiteSpace = SU.getWhiteSpace(8)
+    val prefix = SU.getWhiteSpace(8)
     for {
       field <- fields
     } yield {
-      whiteSpace + field
+      val suffix = if (SU.isLast(fields, field)) "" else ","
+      prefix + "\"" + field + "\"" + suffix
     }
   }
 }
