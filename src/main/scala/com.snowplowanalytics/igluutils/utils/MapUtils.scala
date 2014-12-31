@@ -11,22 +11,24 @@
  * See the Apache License Version 2.0 for the specific language governing permissions and limitations there under.
  */
 package com.snowplowanalytics.igluutils
-package generators
+package utils
 
-// Scalaz
-import scalaz._
-import Scalaz._
+// Scala
+import scala.collection.immutable.ListMap
 
-// Jackson
-import com.fasterxml.jackson.databind.JsonNode
-import com.fasterxml.jackson.core.JsonParseException
+/**
+ * Utilities for manipulating Maps
+ */
+object MapUtils {
 
-// json4s
-import org.json4s._
-import org.json4s.JsonDSL._
-import org.json4s.jackson.JsonMethods._
-import org.json4s.scalaz.JsonScalaz._
-
-object RedshiftDdlGenerator {
-
+  /**
+   * Organising all of the key -> value pairs
+   * in the Map by alphabetical order.
+   *
+   * @param paths The Map that needs to be ordered.
+   * @return an ordered ListMap of paths that are now in
+   *         alphabetical order.
+   */
+  def getOrderedMap(paths: Map[String, Map[String, String]]): ListMap[String, Map[String, String]] =
+    ListMap(paths.toSeq.sortBy(_._1):_*)
 }
