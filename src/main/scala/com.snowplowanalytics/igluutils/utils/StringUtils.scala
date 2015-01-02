@@ -94,6 +94,18 @@ object StringUtils {
     if (list.last == test) true else false
 
   /**
+   * Formats the file name from a self-desc schema into 
+   * correct style and appeneds an '_1' to the string.
+   *
+   * @param name The 'maybe' unformatted file name which
+   *        will be updated.
+   * @return an updated file name string which can be used
+   *         for both SQL and JsonPath files
+   */
+  def formatFileName(name: String): String =
+    name.replaceAll("([^A-Z_])([A-Z])", "$1_$2").toLowerCase.concat("_1")
+
+  /**
    * Builds a Schema name from variables.
    * 
    * @param vendor The vendor of the schema
