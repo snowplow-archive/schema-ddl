@@ -13,7 +13,7 @@
 package com.snowplowanalytics.igluutils
 package generators
 
-// Snowplow
+// This project
 import utils.{MapUtils => MU}
 
 // Scalaz

@@ -13,7 +13,7 @@
 package com.snowplowanalytics.igluutils
 package generators
 
-// Snowplow
+// This project
 import utils.{StringUtils => SU}
 
 // Scalaz
@@ -163,10 +163,10 @@ object RedshiftDdlGenerator {
               case Failure(str) => str.fail
             }
           }
-          case (_, _, _) => s"Error: Function - `processSelfDesc` - Information missing from self-describing elements!".fail
+          case (_, _, _) => s"Error: Function - `processSelfDesc` - Information missing from self-describing elements".fail
         }
       }
-      case None => s"Error: Function - `processSelfDesc` - We are missing the self-describing elements!".fail
+      case None => s"Error: Function - `processSelfDesc` - We are missing the self-describing elements".fail
     }
 
   /**
