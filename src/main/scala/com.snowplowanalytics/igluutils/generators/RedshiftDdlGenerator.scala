@@ -13,7 +13,7 @@
 package com.snowplowanalytics.igluutils
 package generators
 
-// Utils
+// Snowplow
 import utils.{StringUtils => SU}
 
 // Scalaz
@@ -123,9 +123,8 @@ object RedshiftDdlGenerator {
     // Process the new lists...
     (selfDesc, data) match {
       case (Success(a), Success(b)) => (RedshiftDdlDefaultHeader ++ a ++ RedshiftDdlDefaultTables ++ b ++ RedshiftDdlDefaultEnd).success
-      case (Failure(a), Failure(b)) => (a + "," + b).fail
-      case (Failure(str),        _) => str.fail
-      case (_,        Failure(str)) => str.fail
+      case (Failure(a),        _)   => a.fail // If data processing failed
+      case (_,        Failure(b))   => b.fail // If self-desc processing failed
     }
   }
 
@@ -138,13 +137,13 @@ object RedshiftDdlGenerator {
    * @return a validated list of strings that contain the
    *         relevant information
    */
-  private def processSelfDesc(flatSelfElems: ListMap[String, Map[String, String]]): Validation[String, List[String]] =
+  private[generators] def processSelfDesc(flatSelfElems: ListMap[String, Map[String, String]]): Validation[String, List[String]] =
     flatSelfElems.get("self") match {
-      case Some(values) => {
+      case Some(elems) => {
 
-        val vendor  = values.get("vendor")
-        val name    = values.get("name")
-        val version = values.get("version")
+        val vendor  = elems.get("vendor")
+        val name    = elems.get("name")
+        val version = elems.get("version")
 
         (vendor, name, version) match {
           case (Some(a), Some(b), Some(c)) => {
@@ -164,10 +163,10 @@ object RedshiftDdlGenerator {
               case Failure(str) => str.fail
             }
           }
-          case (_, _, _) => s"Error: Function - `processSelfDesc` - Should never happen; Information missing cannot process".fail
+          case (_, _, _) => s"Error: Function - `processSelfDesc` - Information missing from self-describing elements!".fail
         }
       }
-      case None => s"Error: Function - `processSelfDesc` - Should never happen; Information missing cannot process".fail
+      case None => s"Error: Function - `processSelfDesc` - We are missing the self-describing elements!".fail
     }
 
   /**
@@ -184,7 +183,10 @@ object RedshiftDdlGenerator {
    *         key and an encoding/storage rule for the data that
    *         will come with it
    */
-  private def processData(flatDataElems: ListMap[String, Map[String, String]]): Iterable[String] = {
+   // TODO: Add ability to append information after the suffix for 
+   //       what type of encoding it is or why we used that type of encoding
+  private[generators] def processData(flatDataElems: ListMap[String, Map[String, String]]): Iterable[String] = {
+
     // Get the size of the longest key in the map
     val keys = flatDataElems.keys.toList
     val maxLen = SU.getLongest(keys).size
@@ -208,11 +210,11 @@ object RedshiftDdlGenerator {
    * Returns the encode type based on what attrbutes
    * are contained within the providied map.
    *
-   * @param attrs The map to be analyzeds
+   * @param attrs The map of attributes to be analyzed
    * @return the encode type as a String
    */
    //TODO: Flesh out definitions for encode types based on attributes
-  private def getEncodeType(attrs: Map[String, String]): String =
+  private[generators] def getEncodeType(attrs: Map[String, String]): String =
     attrs match {
       case map => {
         (map.get("type"), map.get("format")) match {

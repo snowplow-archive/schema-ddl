@@ -13,7 +13,7 @@
 package com.snowplowanalytics.igluutils
 package generators
 
-// Utils
+// Snowplow
 import utils.{StringUtils => SU}
 
 // Scalaz
@@ -103,7 +103,7 @@ object JsonPathGenerator {
    *        white space added
    * @return the formatted fields
    */
-  private def formatFields(fields: List[String]): List[String] = {
+  private[generators] def formatFields(fields: List[String]): List[String] = {
     val prefix = SU.getWhiteSpace(8)
     for {
       field <- fields

@@ -13,7 +13,7 @@
 package com.snowplowanalytics.igluutils
 package generators
 
-// Utils
+// Snowplow
 import utils.{MapUtils => MU}
 
 // Scalaz
@@ -103,7 +103,7 @@ object SchemaFlattener {
    * @return a validated map of keys and attributes or a 
    *         failure string
    */
-  private def processProperties(propertyList: List[(String, JValue)], accum: Map[String, Map[String, String]] = Map(), accumKey: String = ""): 
+  private[generators] def processProperties(propertyList: List[(String, JValue)], accum: Map[String, Map[String, String]] = Map(), accumKey: String = ""): 
     Validation[String, Map[String, Map[String, String]]] = {
 
     propertyList match {
@@ -156,7 +156,7 @@ object SchemaFlattener {
    * @param accum The acuumulated Map of String -> String attributes
    * @return a validated map of attributes or a failure string
    */
-  private def processAttributes(attributes: List[(String, JValue)], accum: Map[String, String] = Map()): Validation[String, Map[String, String]] =
+  private[generators] def processAttributes(attributes: List[(String, JValue)], accum: Map[String, String] = Map()): Validation[String, Map[String, String]] =
     attributes match {
       case x :: xs => {
         x match {
@@ -194,7 +194,7 @@ object SchemaFlattener {
    * @return A validated String containing all entities of the
    *         list that was passed or a failure string
    */ 
-  private def processList(list: List[JValue], accum: String = "", delim: String = ","): Validation[String, String] =
+  private[generators] def processList(list: List[JValue], accum: String = "", delim: String = ","): Validation[String, String] =
     list match {
       case x :: xs => {
         x match {
@@ -214,7 +214,7 @@ object SchemaFlattener {
    * @return a validated map containing the needed self describing
    *         elements
    */
-  private def getSelfDescElems(jSchema: JValue): Validation[String, ListMap[String, Map[String, String]]] = {
+  private[generators] def getSelfDescElems(jSchema: JValue): Validation[String, ListMap[String, Map[String, String]]] = {
     val vendor  = (jSchema \ "self" \ "vendor").extractOpt[String]
     val name    = (jSchema \ "self" \ "name").extractOpt[String]
     val version = (jSchema \ "self" \ "version").extractOpt[String]
@@ -236,7 +236,7 @@ object SchemaFlattener {
    * @return a map which contains a string illustrating what
    *         needs to be done with the element
    */
-  private def getElemInfo(maybeAttrList: List[(String, JValue)]): Validation[String, Map[String, List[(String, JValue)]]] =
+  private[generators] def getElemInfo(maybeAttrList: List[(String, JValue)]): Validation[String, Map[String, List[(String, JValue)]]] =
     maybeAttrList.toMap.get("type") match {
       case Some(types) => {
         getElemType(types) match {
@@ -268,7 +268,7 @@ object SchemaFlattener {
    * @param types The JValue from the "type" field of an element
    * @return A validated String which determines what type the element is
    */
-  private def getElemType(types: JValue): Validation[String, String] = {
+  private[generators] def getElemType(types: JValue): Validation[String, String] = {
     val maybeTypes = types match {
       case JString(value) => value.success
       case JArray(list) => processList(list)
