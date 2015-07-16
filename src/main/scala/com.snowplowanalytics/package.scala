@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2014 Snowplow Analytics Ltd. All rights reserved.
+ * Copyright (c) 2015 Snowplow Analytics Ltd. All rights reserved.
  *
  * This program is licensed to you under the Apache License Version 2.0,
  * and you may not use this file except in compliance with the Apache License Version 2.0.
@@ -12,12 +12,15 @@
  */
 package com.snowplowanalytics
 
-// Java
-import java.lang.{Integer => JInteger}
-
 // Scalaz
 import scalaz._
 import Scalaz._
+
+// Java
+import java.lang.{Integer => JInteger}
+
+// Scala
+import scala.collection.immutable.ListMap
 
 /**
  * Scala package object to hold types,
@@ -26,4 +29,18 @@ import Scalaz._
  * See:
  * http://www.artima.com/scalazine/articles/package_objects.html
  */
-package object igluutils {}
+package object schemaddl {
+  /**
+   * Class containing all information taken from Self-describing Schema
+   */
+  case class SelfDescInfo(vendor: String, name: String, version: String, format: String = "jsonschema")
+
+  /**
+   * Flat schema container. Contains self-describing properties in ``self``
+   * and all primitive types as ordered flatten map in ``elems``
+   *
+   * @param elems The ordered map of every primitive type in schema
+   *              and it's unordered map of properties
+   */
+  case class FlatSchema(elems: ListMap[String, Map[String, String]], required: Set[String] = Set.empty[String])
+}

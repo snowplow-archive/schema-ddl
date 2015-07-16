@@ -10,7 +10,7 @@
  * "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the Apache License Version 2.0 for the specific language governing permissions and limitations there under.
  */
-package com.snowplowanalytics.igluutils
+package com.snowplowanalytics.schemaddl
 package utils
 
 // Scala
@@ -22,8 +22,7 @@ import scala.collection.immutable.ListMap
 object MapUtils {
 
   /**
-   * Organising all of the key -> value pairs
-   * in the Map by alphabetical order.
+   * Organising all of the key -> value pairs in the Map by alphabetical order
    *
    * @param paths The Map that needs to be ordered.
    * @return an ordered ListMap of paths that are now in

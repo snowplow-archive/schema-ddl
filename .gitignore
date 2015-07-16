@@ -1,6 +1,10 @@
 *.class
 *.log
 
+# Vagrant
+.vagrant
+VERSION
+
 # sbt specific
 dist/*
 target/
@@ -8,3 +12,7 @@ lib_managed/
 src_managed/
 project/boot/
 project/plugins/project/
+
+# OS & IDE
+.idea
+.DS_Store

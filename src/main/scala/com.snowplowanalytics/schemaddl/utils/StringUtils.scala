@@ -10,24 +10,13 @@
  * "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the Apache License Version 2.0 for the specific language governing permissions and limitations there under.
  */
-package com.snowplowanalytics.igluutils
+package com.snowplowanalytics.schemaddl
 package utils
-
-// Scalaz
-import scalaz._
-import Scalaz._
-
-// Scala
-import scala.util.matching.Regex
 
 /**
  * Utilities for manipulating Strings
  */
 object StringUtils {
-
-  // Regex used to generate the table name from a schema
-  private val schemaPattern = """.+:([a-zA-Z0-9_\.]+)/([a-zA-Z0-9_]+)/[^/]+/(.*)""".r
-
   /**
    * Will return the longest string in an Iterable
    * string list.
@@ -108,14 +97,11 @@ object StringUtils {
   /**
    * Builds a Schema name from variables.
    * 
-   * @param vendor The vendor of the schema
-   * @param name The name of the event the 
-   *        schema describes
-   * @param version The version of the schema
+   * @param info Information extracted from self-describing JSON Schema
    * @return a valid schema name
    */
-  def getSchemaName(vendor: String, name: String, version: String): String =
-    "iglu:"+vendor+"/"+name+"/jsonschema/"+version
+  def getSchemaName(info: SelfDescInfo): String =
+    "iglu:"+info.vendor+"/"+info.name+"/jsonschema/"+info.version
 
   /**
    * Create a Redshift Table name from a schema
@@ -125,21 +111,70 @@ object StringUtils {
    * @param schema The Schema name
    * @return the Redshift Table name
    */
-  def schemaToRedshift(schema: String): Validation[String, String] =
-    schema match {
-      case schemaPattern(organization, name, schemaVer) => {
+  def getTableName(schema: SelfDescInfo): String = {
+    // Split the vendor's reversed domain name using underscores rather than dots
+    val snakeCaseOrganization = schema.vendor.replaceAll( """\.""", "_").replaceAll("-", "_").toLowerCase
 
-        // Split the vendor's reversed domain name using underscores rather than dots
-        val snakeCaseOrganization = organization.replaceAll("""\.""", "_").toLowerCase
+    // Change the name from PascalCase to snake_case if necessary
+    val snakeCaseName = snakify(schema.name)
 
-        // Change the name from PascalCase to snake_case if necessary
-        val snakeCaseName = name.replaceAll("([^A-Z_])([A-Z])", "$1_$2").toLowerCase
+    // Extract the schemaver version's model
+    val model = schema.version.split("-")(0)
 
-        // Extract the schemaver version's model
-        val model = schemaVer.split("-")(0)
+    s"${snakeCaseOrganization}_${snakeCaseName}_${model}"
+  }
 
-        s"${snakeCaseOrganization}_${snakeCaseName}_${model}".success
+  /**
+   * Create a Redshift Table name from a file name
+   *
+   * "customerEvent.json" -> "customer_event"
+   *
+   * @param fileName file name with JSON Schema
+   * @return the Redshift Table name
+   */
+  def getTableName(fileName: String): String = {
+    val fileNameWithoutExtension =
+      if (fileName.endsWith(".json")) fileName.dropRight(5)
+      else fileName
+    snakify(fileNameWithoutExtension)
+  }
+
+  /**
+   * Transforms CamelCase string into snake_case
+   * Also replaces all hyphens with underscores
+   *
+   * @param str string to transform
+   * @return the underscored string
+   */
+  def snakify(str: String): String =
+    str.replaceAll("([A-Z]+)([A-Z][a-z])", "$1_$2").replaceAll("([a-z\\d])([A-Z])", "$1_$2").replaceAll("-", "_").toLowerCase
+
+  /**
+   * Checks if comma-delimited string contains only integers (including negative)
+   *
+   * @param string string with items delimited by comma
+   * @return true if string contains only integers
+   */
+  def isIntegerList(string: String): Boolean = {
+    val elems = string.split(",").toList
+    if (elems.length == 0) { false }
+    else {
+      elems.forall { s =>
+        s.headOption match {
+          case Some('-') if s.length > 1 => s.tail.forall(_.isDigit)
+          case _ => s.forall(_.isDigit) }
       }
-      case _ => "Error: Function - `getTableName` - Schema %s does not conform to regular expression %s".format(schema, schemaPattern.toString).fail
     }
+  }
+
+  /**
+   * Utility object to match convertible strings
+   */
+  object IntegerAsString {
+    def unapply(s : String) : Option[Int] = try {
+      Some(s.toInt)
+    } catch {
+      case _: java.lang.NumberFormatException => None
+    }
+  }
 }
