@@ -15,7 +15,7 @@
 import sbt._
 import Keys._
 
-object IgluUtilsBuild extends Build {
+object SchemaDdlBuild extends Build {
 
   import Dependencies._
   import BuildSettings._
@@ -27,7 +27,7 @@ object IgluUtilsBuild extends Build {
 
   // Define our project, with basic project information and library
   // dependencies.
-  lazy val project = Project("iglu-utils", file("."))
+  lazy val project = Project("schema-ddl", file("."))
     .settings(buildSettings: _*)
     .settings(
       libraryDependencies ++= Seq(
@@ -35,8 +35,9 @@ object IgluUtilsBuild extends Build {
         Libraries.yodaTime,
         Libraries.yodaConvert,
         Libraries.jacksonDatabind,
-        Libraries.jsonValidator,    
+        Libraries.jsonValidator,
         // Scala
+        Libraries.argot,
         Libraries.scalaz7,
         Libraries.json4sJackson,
         Libraries.json4sScalaz,

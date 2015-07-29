@@ -27,6 +27,7 @@ object Dependencies {
     val jacksonDatabind  = "2.2.3"
     val jsonValidator    = "2.2.3"
     // Scala
+    val argot            = "1.0.3"
     val scalaz7          = "7.0.0"
     val json4s           = "3.2.11"
     val igluClient       = "0.1.1"
@@ -44,6 +45,7 @@ object Dependencies {
     val jacksonDatabind  = "com.fasterxml.jackson.core" %  "jackson-databind"          % V.jacksonDatabind
     val jsonValidator    = "com.github.fge"             %  "json-schema-validator"     % V.jsonValidator
     // Scala
+    val argot            = "org.clapper"                %% "argot"                     % V.argot
     val scalaz7          = "org.scalaz"                 %% "scalaz-core"               % V.scalaz7
     val json4sJackson    = "org.json4s"                 %% "json4s-jackson"            % V.json4s
     val json4sScalaz     = "org.json4s"                 %% "json4s-scalaz"             % V.json4s    
