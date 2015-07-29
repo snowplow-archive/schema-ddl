@@ -45,16 +45,19 @@ object BuildSettings {
     Seq(file)
   })
 
-  // sbt-assembly settings for building a fat jar
-  import sbtassembly.Plugin._
-  import AssemblyKeys._
-  lazy val sbtAssemblySettings = assemblySettings ++ Seq(
+  // Publish settings
+  // TODO: update with ivy credentials etc when we start using Nexus
+  lazy val publishSettings = Seq[Setting[_]](
+    // Enables publishing to maven repo
+    publishMavenStyle := true,
 
-    // Simpler jar name
-    jarName in assembly := {
-      name.value + ".jar"
+    publishTo <<= version { version =>
+      val basePath = "target/repo/%s".format {
+        if (version.trim.endsWith("SNAPSHOT")) "snapshots/" else "releases/"
+      }
+      Some(Resolver.file("Local Maven repository", file(basePath)) transactional())
     }
   )
 
-  lazy val buildSettings = basicSettings ++ scalifySettings ++ sbtAssemblySettings
+  lazy val buildSettings = basicSettings ++ scalifySettings ++ publishSettings
 }
