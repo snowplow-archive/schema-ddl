@@ -82,14 +82,13 @@ object SchemaFlattener {
     // Match against the Schema and check that it is properly formed: i.e. wrapped in { ... }
     jSchema match {
       case JObject(list) => {
-
         // Analyze the base level of the schema
         getElemInfo(list) match {
           case Success(ObjectInfo(properties, required)) => {
-            processProperties(properties) match {
+            processProperties(properties, requiredKeys = required, requiredAccum = required) match {
               case Success(subSchema) => {
                 val elems = if (splitProduct) splitProductTypes(subSchema.elems) else subSchema.elems
-                FlatSchema(MU.getOrderedMap(elems), required ++ subSchema.required).success
+                FlatSchema(MU.getOrderedMap(elems), subSchema.required).success
               }
               case Failure(str) => str.fail
             }
@@ -175,7 +174,8 @@ object SchemaFlattener {
   private[generators] def processProperties(propertyList: List[JField],
                                             accum: Map[String, Map[String, String]] = Map(),
                                             accumKey: String = "",
-                                            requiredKeys: Set[String] = Set.empty):
+                                            requiredKeys: Set[String] = Set.empty,
+                                            requiredAccum: Set[String] = Set.empty ):
     Validation[String, SubSchema] = {
 
     propertyList match {
@@ -184,11 +184,13 @@ object SchemaFlattener {
           case (key, JObject(list)) => {
             getElemInfo(list) match {
               case Success(ObjectInfo(properties, required)) =>
-                processProperties(properties, Map(), accumKey + key + ".", required)
+                val currentLevelRequired = if (requiredAccum.contains(key)) { required } else { Set.empty[String] }
+                val keys = properties.map(_._1).filter(currentLevelRequired.contains(_)).map(accumKey + key + "." + _)
+                processProperties(properties, Map(), accumKey + key + ".", keys.toSet, required)
               case Success(ArrayInfo) =>
                 SubSchema(Map(accumKey + key -> Map("type" -> "array")), Set.empty[String]).success
               case Success(_) => processAttributes(list) match {
-                case Success(attr) => SubSchema(Map(accumKey + key -> attr), requiredKeys).success
+                case Success(attr) => SubSchema(Map(accumKey + key -> attr), Set.empty[String]).success
                 case Failure(str)  => str.fail
               }
               case Failure(str) => str.fail
@@ -199,12 +201,12 @@ object SchemaFlattener {
 
         res match {
           case Success(goodRes) => {
-            processProperties(xs, (accum ++ goodRes.elems), accumKey, requiredKeys ++ goodRes.required)
+            processProperties(xs, (accum ++ goodRes.elems), accumKey, requiredKeys ++ goodRes.required, requiredAccum)
           }
           case Failure(badRes) => badRes.fail
         }
       }
-      case Nil => SubSchema(accum, requiredKeys.map(accumKey + _)).success
+      case Nil => SubSchema(accum, requiredKeys).success
     }
   }
 
@@ -294,8 +296,7 @@ object SchemaFlattener {
   /**
    * Returns information about a single list element:
    * - What 'core' type the element is (object,array,other)
-   * - If it is an 'object' returns the properties list for 
-   *   processing
+   * - If it is an 'object' returns the properties list for processing
    *
    * @param maybeAttrList The list of attributes which need to be analysed to
    *                      determine what to do with them
