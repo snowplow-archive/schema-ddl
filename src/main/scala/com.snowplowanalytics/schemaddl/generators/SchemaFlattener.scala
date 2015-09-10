@@ -69,6 +69,12 @@ object SchemaFlattener {
   private[generators] case class ObjectInfo(properties: List[JField], required: Set[String]) extends Info
 
   /**
+   * Helper object extracted from JSON Schema's object which should be
+   * represented as VARCHAR(4096) in future
+   */
+  private[generators] case object FlattenObjectInfo extends Info
+
+  /**
    * Flattens a JsonSchema into a useable Map of Strings and Attributes.
    * - Will extract the self-describing elements of the JsonSchema out
    * - Will then grab the first properties list and begin the recursive function
@@ -92,6 +98,9 @@ object SchemaFlattener {
               }
               case Failure(str) => str.fail
             }
+          }
+          case Success(FlattenObjectInfo) => {
+            FlatSchema(MU.getOrderedMap(Map.empty[String, Map[String, String]]), Set.empty[String]).success
           }
           case Failure(str) => str.fail
           case _ => s"Error: Function - 'flattenJsonSchema' - JsonSchema does not begin with an 'object' & 'properties'".fail
@@ -183,12 +192,17 @@ object SchemaFlattener {
         val res: Validation[String, SubSchema] = x match {
           case (key, JObject(list)) => {
             getElemInfo(list) match {
-              case Success(ObjectInfo(properties, required)) =>
+              case Success(ObjectInfo(properties, required)) => {
                 val currentLevelRequired = if (requiredAccum.contains(key)) { required } else { Set.empty[String] }
                 val keys = properties.map(_._1).filter(currentLevelRequired.contains(_)).map(accumKey + key + "." + _)
                 processProperties(properties, Map(), accumKey + key + ".", keys.toSet, required)
-              case Success(ArrayInfo) =>
+              }
+              case Success(FlattenObjectInfo) => {
+                SubSchema(Map(accumKey + key -> Map("type" -> "string")), Set.empty[String]).success
+              }
+              case Success(ArrayInfo) => {
                 SubSchema(Map(accumKey + key -> Map("type" -> "array")), Set.empty[String]).success
+              }
               case Success(_) => processAttributes(list) match {
                 case Success(attr) => SubSchema(Map(accumKey + key -> attr), Set.empty[String]).success
                 case Failure(str)  => str.fail
@@ -310,16 +324,18 @@ object SchemaFlattener {
         getElemType(types) match {
           case (Success(elemType)) => {
             elemType match {
-              case "object" => {    // TODO: probably won't work on complex product types
-                objectMap.get("properties") match {
-                  case Some(JObject(props)) => {
+              case "object" => {
+                // TODO: probably won't work on complex product types
+                (objectMap.get("properties"), objectMap.get("patternProperties")) match {
+                  case (Some(JObject(props)), _) => {
                     val requiredFields = getRequiredProperties(objectMap)
                     requiredFields match {
                       case Success(required) => ObjectInfo(props, required.toSet).success
                       case Failure(str) => str.fail
                     }
                   }
-                  case _ => s"Error: Function - 'getElemInfo' - JsonSchema 'object' does not have any properties".fail
+                  case (_, Some(JObject(_))) => FlattenObjectInfo.success
+                  case _ => s"Error: Function - 'getElemInfo' - JsonSchema 'object' does not have properties nor patternProperties".fail
                 }
               }
               case "array"  => ArrayInfo.success

@@ -14,8 +14,6 @@ package com.snowplowanalytics.schemaddl
 package generators
 package redshift
 
-import scala.annotation.tailrec
-
 object EncodeSuggestions {
   import Ddl._
 
