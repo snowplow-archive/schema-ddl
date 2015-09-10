@@ -35,6 +35,7 @@ import utils.{ StringUtils => SU }
 object RedshiftDdlGenerator {
   import redshift.Ddl._
   import redshift.TypeSuggestions._
+  import redshift.EncodeSuggestions._
 
   // Settings for the header of the file
   private object HeaderTextSettings {
@@ -84,7 +85,7 @@ object RedshiftDdlGenerator {
   // Snowplow-specific columns
   private[redshift] val parentageColumns = List(
     Column("root_id", DataTypes.RedshiftChar(36), Set(CompressionEncodings.RawEncoding), Set(ColumnConstraints.NotNull)),
-    Column("root_tstamp", DataTypes.RedshiftTimestamp, Set(CompressionEncodings.RawEncoding), Set(ColumnConstraints.NotNull)),
+    Column("root_tstamp", DataTypes.RedshiftTimestamp, Set(CompressionEncodings.LzoEncoding), Set(ColumnConstraints.NotNull)),
     Column("ref_root", DataTypes.RedshiftVarchar(255), Set(CompressionEncodings.RunLengthEncoding), Set(ColumnConstraints.NotNull)),
     Column("ref_tree", DataTypes.RedshiftVarchar(1500), Set(CompressionEncodings.RunLengthEncoding), Set(ColumnConstraints.NotNull)),
     Column("ref_parent", DataTypes.RedshiftVarchar(255), Set(CompressionEncodings.RunLengthEncoding), Set(ColumnConstraints.NotNull))
@@ -150,11 +151,11 @@ object RedshiftDdlGenerator {
       (columnName, properties) <- flatDataElems
     } yield {
       val dataType = getDataType(properties, varcharSize, columnName)
+      val encoding = getEncoding(properties, dataType, columnName)
       val constraints =    // only "NOT NULL" now
         if (checkNullability(properties, required.contains(columnName))) Set.empty[ColumnConstraint]
         else Set[ColumnConstraint](ColumnConstraints.NotNull)
-
-      Column(columnName, dataType, columnConstraints = constraints)
+      Column(columnName, dataType, columnAttributes = Set(encoding), columnConstraints = constraints)
     }
   }
 
@@ -170,6 +171,10 @@ object RedshiftDdlGenerator {
     uuidSuggestion,
     varcharSuggestion
   )
+
+  // List of compression encoding suggestions
+  val encodingSuggestions: List[EncodingSuggestion] = List(lzoSuggestion)
+
 
   /**
    * Takes each suggestion out of ``dataTypeSuggesions`` and decide whether
@@ -193,6 +198,32 @@ object RedshiftDdlGenerator {
       case suggestion :: tail => suggestion(properties, columnName) match {
         case Some(format) => format
         case None => getDataType(properties, varcharSize, columnName, tail)
+      }
+    }
+  }
+
+  /**
+   * Takes each suggestion out of ``compressionEncodingSuggestions`` and
+   * decide whether current properties satisfy it, then return the compression
+   * encoding.
+   * If nothing suggested LZO Encoding returned as default
+   *
+   * @param properties is a string we need to recognize
+   * @param dataType redshift data type for current column
+   * @param columnName to produce warning
+   * @param suggestions list of functions can recognize encode type
+   * @return some format or none if nothing suites
+   */
+  @tailrec
+  private[generators] def getEncoding(properties: Map[String, String],
+                                      dataType: DataType,
+                                      columnName: String,
+                                      suggestions: List[EncodingSuggestion] = encodingSuggestions): CompressionEncoding = {
+    suggestions match {
+      case Nil => CompressionEncodings.LzoEncoding    // LZO is default for user-generated
+      case suggestion :: tail => suggestion(properties, dataType, columnName) match {
+        case Some(encoding) => encoding
+        case None => getEncoding(properties, dataType, columnName, tail)
       }
     }
   }
