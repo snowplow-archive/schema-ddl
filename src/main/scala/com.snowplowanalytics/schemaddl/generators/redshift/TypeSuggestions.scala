@@ -15,7 +15,7 @@ package generators
 package redshift
 
 // This project
-import utils.{StringUtils => SU}
+import utils.{ StringUtils => SU }
 
 /**
  * Module containing functions for data type suggestions
@@ -94,7 +94,7 @@ object TypeSuggestions {
 
   val uuidSuggestion: DataTypeSuggestion = (properties, columnName) => {
     (properties.get("type"), properties.get("format")) match {
-      case (Some("string"), Some("uuid")) =>
+      case (Some(types), Some("uuid")) if types.contains("string") =>
         Some(DataTypes.RedshiftChar(36))
       case _ => None
     }
@@ -102,20 +102,21 @@ object TypeSuggestions {
 
   val varcharSuggestion: DataTypeSuggestion = (properties, columnName) => {
     (properties.get("type"), properties.get("maxLength"), properties.get("enum"), properties.get("format")) match {
-      case (Some("string"),  _,                           _,                      Some("ipv6")) =>
+      case (Some(types),     _,                           _,                      Some("ipv6")) if types.contains("string") =>
         Some(DataTypes.RedshiftVarchar(39))
-      case (Some("string"),  _,                           _,                      Some("ipv4")) =>
+      case (Some(types),     _,                           _,                      Some("ipv4")) if types.contains("string") =>
         Some(DataTypes.RedshiftVarchar(15))
-      case (Some("string"), Some(SU.IntegerAsString(maxLength)), _,               _) =>
+      case (Some(types),     Some(SU.IntegerAsString(maxLength)), _,              _) if types.contains("string") =>
         Some(DataTypes.RedshiftVarchar(maxLength))
-      case (_,              _,                            Some(enum),             _) =>
+      case (_,              _,                            Some(enum),             _) => {
         val enumItems = enum.split(",")
-        val maxLength = enumItems.toList.reduceLeft((a, b) => if(a.length > b.length) a else b).length
+        val maxLength = enumItems.toList.reduceLeft((a, b) => if (a.length > b.length) a else b).length
         if (enumItems.length == 1) {
           Some(DataTypes.RedshiftChar(maxLength))
         } else {
           Some(DataTypes.RedshiftVarchar(maxLength))
         }
+      }
       case _ => None
     }
   }
