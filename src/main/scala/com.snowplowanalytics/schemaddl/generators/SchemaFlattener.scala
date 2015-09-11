@@ -230,7 +230,7 @@ object SchemaFlattener {
    * or 'array'.
    *
    * @param attributes The list of attributes that an element has
-   * @param accum The acuumulated Map of String -> String attributes
+   * @param accum The accumulated Map of String -> String attributes
    * @return a validated map of attributes or a failure string
    */
   @tailrec
@@ -260,6 +260,8 @@ object SchemaFlattener {
    * Takes a list of values (currently only numbers and strings) and converts
    * them into a single string delimited by a comma
    *
+   * List(JInt(3), JNull, JString(hello)) -> 3,null,hello
+   *
    * @param list The list of values to be combined
    * @param accum The accumulated String from the list
    * @param delim The deliminator to be used between strings
@@ -273,6 +275,8 @@ object SchemaFlattener {
           case JString(str) => stringifyArray(xs, (accum + delim + str))
           case JInt(x)      => stringifyArray(xs, (accum + delim + x.toString))
           case JDecimal(x)  => stringifyArray(xs, (accum + delim + x.toString))
+          case JDouble(x)   => stringifyArray(xs, (accum + delim + x.toString))
+          case JNull        => stringifyArray(xs, (accum + delim + "null"))
           case _            => s"Error: Function - 'processList' - Invalid JValue: $x in list".fail
         }
       }

@@ -161,6 +161,7 @@ object RedshiftDdlGenerator {
 
   // List of data type suggestions
   val dataTypeSuggestions: List[DataTypeSuggestion] = List(
+    complexEnumSuggestion,
     productSuggestion,
     timestampSuggestion,
     arraySuggestion,
