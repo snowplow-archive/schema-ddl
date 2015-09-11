@@ -330,15 +330,15 @@ object SchemaFlattener {
             elemType match {
               case "object" => {
                 // TODO: probably won't work on complex product types
-                (objectMap.get("properties"), objectMap.get("patternProperties")) match {
-                  case (Some(JObject(props)), _) => {
+                (objectMap.get("properties"), objectMap.get("patternProperties"), objectMap.get("additionalProperties")) match {
+                  case (Some(JObject(props)), _, _) =>
                     val requiredFields = getRequiredProperties(objectMap)
                     requiredFields match {
                       case Success(required) => ObjectInfo(props, required.toSet).success
                       case Failure(str) => str.fail
                     }
-                  }
-                  case (_, Some(JObject(_))) => FlattenObjectInfo.success
+                  case (_, Some(JObject(_)), _) => FlattenObjectInfo.success
+                  case (_, _, Some(JBool(false))) => FlattenObjectInfo.success
                   case _ => s"Error: Function - 'getElemInfo' - JsonSchema 'object' does not have properties nor patternProperties".fail
                 }
               }
