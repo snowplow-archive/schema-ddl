@@ -24,6 +24,7 @@ object BuildSettings {
     version               :=  "0.2.0-M1",
     description           :=  "For deriving Redshift DDLs with JSON Paths from JSON Schemas",
     scalaVersion          :=  "2.10.5",
+    crossScalaVersions    :=  Seq("2.10.5", "2.11.7"),
     scalacOptions         :=  Seq("-deprecation", "-encoding", "utf8",
                                   "-unchecked", "-feature",
                                   "-target:jvm-1.7"),

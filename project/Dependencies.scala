@@ -28,13 +28,12 @@ object Dependencies {
     val jsonValidator    = "2.2.3"
     // Scala
     val argot            = "1.0.3"
-    val scalaz7          = "7.0.0"
+    val scalaz7          = "7.0.8"
     val json4s           = "3.2.11"
-    val igluClient       = "0.1.1"
     // Scala (test only)
-    val specs2           = "1.14"
-    val scalazSpecs2     = "0.1.2"
-    val scalaCheck       = "1.10.0"
+    val specs2           = "2.3.13"
+    val scalazSpecs2     = "0.2"
+    val scalaCheck       = "1.12.2"
     val commonsCodec     = "1.5"
   }
 
@@ -49,7 +48,6 @@ object Dependencies {
     val scalaz7          = "org.scalaz"                 %% "scalaz-core"               % V.scalaz7
     val json4sJackson    = "org.json4s"                 %% "json4s-jackson"            % V.json4s
     val json4sScalaz     = "org.json4s"                 %% "json4s-scalaz"             % V.json4s    
-    val igluClient       = "com.snowplowanalytics"      %  "iglu-scala-client"         % V.igluClient
     // Scala (test only)
     val specs2           = "org.specs2"                 %% "specs2"                    % V.specs2         % "test"
     val scalazSpecs2     = "org.typelevel"              %% "scalaz-specs2"             % V.scalazSpecs2   % "test"

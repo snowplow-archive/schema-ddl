@@ -41,7 +41,6 @@ object SchemaDdlBuild extends Build {
         Libraries.scalaz7,
         Libraries.json4sJackson,
         Libraries.json4sScalaz,
-        Libraries.igluClient,
         // Scala (test only)
         Libraries.specs2,
         Libraries.scalazSpecs2,
