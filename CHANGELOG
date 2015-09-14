@@ -1,5 +1,5 @@
-0.2.0 (2015-09-14)
-------------------
+Version 0.2.0 (2015-09-14)
+--------------------------
 Added Scala 2.11 support (#28)
 Added compression encodings (#29)
 Default varchar size changed to 4096 (#30)
@@ -11,6 +11,6 @@ Fixed ignoring maxLength for a type enum (#35)
 Now handling nested non-required properties (#36)
 Added COMMENT ON in Redshift DDL (#38)
 
-0.1.0 (2015-07-29)
-------------------
+Version 0.1.0 (2015-07-29)
+--------------------------
 Initial release
