@@ -190,7 +190,6 @@ object Ddl {
     }
   }
 
-
   /**
    * Data types
    * http://docs.aws.amazon.com/redshift/latest/dg/c_Supported_data_types.html
@@ -350,5 +349,18 @@ object Ddl {
     def toDdl = s"CREATE SCHEMA IF NOT EXISTS $schemaName;"
   }
 
+  // COMMENT
+
+  /**
+   * COMMENT ON
+   * { TABLE object_name | COLUMN object_name.column_name |
+   * CONSTRAINT constraint_name ON table_name |
+   * DATABASE object_name |
+   * VIEW object_name }
+   * IS 'text'
+   */
+  case class Comment(tableName: String, comment: String) extends Ddl {
+    def toDdl = s"COMMENT ON TABLE $tableName IS '$comment';"
+  }
 }
 

@@ -15,7 +15,7 @@ package generators
 package redshift
 
 // This project
-import utils.{StringUtils => SU}
+import utils.{ StringUtils => SU }
 
 /**
  * Module containing functions for data type suggestions
@@ -29,10 +29,19 @@ object TypeSuggestions {
    */
   type DataTypeSuggestion = (Map[String, String], String) => Option[DataType]
 
-  // Suggest VARCHAR(4096) for all product types. Should be first
+  // For complex enums Suggest VARCHAR with length of longest element
+  val complexEnumSuggestion: DataTypeSuggestion = (properties, columnName) =>
+    properties.get("enum") match {
+      case Some(enums) if isComplexEnum(enums) =>
+        val longest = excludeNull(enums).map(_.length).max
+        Some(DataTypes.RedshiftVarchar(longest))
+      case _ => None
+    }
+
+  // Suggest VARCHAR(4096) for all product types. Should be in the beginning
   val productSuggestion: DataTypeSuggestion = (properties, columnName) =>
     properties.get("type") match {
-      case (Some(types)) if (types.split(",").toSet - "null").size > 1 =>
+      case (Some(types)) if excludeNull(types).size > 1 =>
         Some(CustomDataTypes.ProductType(List(s"Product type $types encountered in $columnName")))
       case _ => None
     }
@@ -52,12 +61,10 @@ object TypeSuggestions {
     }
 
   val numberSuggestion: DataTypeSuggestion = (properties, columnName) =>
-    (properties.get("type"), properties.get("multiplyOf"), properties.get("maximum")) match {
-      case (Some(types), Some(multiplyOf), Some(maximum)) if (types.contains("number") && multiplyOf == "0.01") =>
+    (properties.get("type"), properties.get("multiplyOf")) match {
+      case (Some(types), Some(multiplyOf)) if (types.contains("number") && multiplyOf == "0.01") =>
         Some(DataTypes.RedshiftDecimal(Some(36), Some(2)))
-      case (Some(types), Some(multiplyOf), _) if (types.contains("number") && multiplyOf == "0.01") =>
-        Some(DataTypes.RedshiftDecimal(Some(36), Some(2)))
-      case (Some(types), _, _) if types.contains("number") =>
+      case (Some(types), _) if types.contains("number") =>
         Some(DataTypes.RedshiftDouble)
       case _ => None
     }
@@ -87,14 +94,14 @@ object TypeSuggestions {
 
   val booleanSuggestion: DataTypeSuggestion = (properties, columnName) => {
     properties.get("type") match {
-      case Some("boolean") => Some(DataTypes.RedshiftBoolean)
+      case Some(types) if excludeNull(types) == Set("boolean") => Some(DataTypes.RedshiftBoolean)
       case _ => None
     }
   }
 
   val uuidSuggestion: DataTypeSuggestion = (properties, columnName) => {
     (properties.get("type"), properties.get("format")) match {
-      case (Some("string"), Some("uuid")) =>
+      case (Some(types), Some("uuid")) if types.contains("string") =>
         Some(DataTypes.RedshiftChar(36))
       case _ => None
     }
@@ -102,23 +109,32 @@ object TypeSuggestions {
 
   val varcharSuggestion: DataTypeSuggestion = (properties, columnName) => {
     (properties.get("type"), properties.get("maxLength"), properties.get("enum"), properties.get("format")) match {
-      case (Some("string"),  _,                           _,                      Some("ipv6")) =>
+      case (Some(types),     _,                           _,                      Some("ipv6")) if types.contains("string") =>
         Some(DataTypes.RedshiftVarchar(39))
-      case (Some("string"),  _,                           _,                      Some("ipv4")) =>
+      case (Some(types),     _,                           _,                      Some("ipv4")) if types.contains("string") =>
         Some(DataTypes.RedshiftVarchar(15))
-      case (Some("string"), Some(SU.IntegerAsString(maxLength)), _,               _) =>
+      case (Some(types),     Some(SU.IntegerAsString(maxLength)), _,              _) if types.contains("string") =>
         Some(DataTypes.RedshiftVarchar(maxLength))
-      case (_,              _,                            Some(enum),             _) =>
+      case (_,              _,                            Some(enum),             _) => {
         val enumItems = enum.split(",")
-        val maxLength = enumItems.toList.reduceLeft((a, b) => if(a.length > b.length) a else b).length
+        val maxLength = enumItems.toList.reduceLeft((a, b) => if (a.length > b.length) a else b).length
         if (enumItems.length == 1) {
           Some(DataTypes.RedshiftChar(maxLength))
         } else {
           Some(DataTypes.RedshiftVarchar(maxLength))
         }
+      }
       case _ => None
     }
   }
+
+  /**
+   * Get set of types or enum as string excluding null
+   *
+   * @param types comma-separated types
+   * @return set of strings
+   */
+  private def excludeNull(types: String): Set[String] = types.split(",").toSet - "null"
 
   /**
    * Helper function to get size of Integer
@@ -131,4 +147,39 @@ object TypeSuggestions {
     else if (max <= Int.MaxValue) Some(DataTypes.RedshiftInteger)
     else if (max <= Long.MaxValue) Some(DataTypes.RedshiftBigInt)
     else None
+
+  /**
+   * Check enum contains some different types
+   * (string and number or number and boolean)
+   */
+  private def isComplexEnum(enum: String) = {
+    // Predicates
+    def isNumeric(s: String) = try {
+      s.toDouble
+      true
+    } catch {
+      case e: NumberFormatException => false
+    }
+    def isNonNumeric(s: String) = !isNumeric(s)
+    def isBoolean(s: String) = s == "true" || s == "false"
+
+    val nonNullEnum = excludeNull(enum)
+    somePredicates(nonNullEnum, List(isNumeric _, isNonNumeric _, isBoolean _), 2)
+  }
+
+  /**
+   * Check at least some `quantity` of `predicates` are true on `instances`
+   *
+   * @param instances list of instances to check on
+   * @param predicates list of predicates to check
+   * @param quantity required quantity
+   */
+  private def somePredicates(instances: Set[String], predicates: List[String => Boolean], quantity: Int): Boolean = {
+    if (quantity == 0) true
+    else predicates match {
+      case Nil => false
+      case h :: tail if instances.exists(h) => somePredicates(instances, tail, quantity - 1)
+      case _ :: tail => somePredicates(instances, tail, quantity)
+    }
+  }
 }

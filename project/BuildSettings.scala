@@ -21,9 +21,10 @@ object BuildSettings {
   // Basic settings for our app
   lazy val basicSettings = Seq[Setting[_]](
     organization          :=  "com.snowplowanalytics",
-    version               :=  "0.1.0",
+    version               :=  "0.2.0",
     description           :=  "For deriving Redshift DDLs with JSON Paths from JSON Schemas",
     scalaVersion          :=  "2.10.5",
+    crossScalaVersions    :=  Seq("2.10.5", "2.11.7"),
     scalacOptions         :=  Seq("-deprecation", "-encoding", "utf8",
                                   "-unchecked", "-feature",
                                   "-target:jvm-1.7"),

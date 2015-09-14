@@ -69,6 +69,12 @@ object SchemaFlattener {
   private[generators] case class ObjectInfo(properties: List[JField], required: Set[String]) extends Info
 
   /**
+   * Helper object extracted from JSON Schema's object which should be
+   * represented as VARCHAR(4096) in future
+   */
+  private[generators] case object FlattenObjectInfo extends Info
+
+  /**
    * Flattens a JsonSchema into a useable Map of Strings and Attributes.
    * - Will extract the self-describing elements of the JsonSchema out
    * - Will then grab the first properties list and begin the recursive function
@@ -82,17 +88,19 @@ object SchemaFlattener {
     // Match against the Schema and check that it is properly formed: i.e. wrapped in { ... }
     jSchema match {
       case JObject(list) => {
-
         // Analyze the base level of the schema
         getElemInfo(list) match {
           case Success(ObjectInfo(properties, required)) => {
-            processProperties(properties) match {
+            processProperties(properties, requiredKeys = required, requiredAccum = required) match {
               case Success(subSchema) => {
                 val elems = if (splitProduct) splitProductTypes(subSchema.elems) else subSchema.elems
-                FlatSchema(MU.getOrderedMap(elems), required ++ subSchema.required).success
+                FlatSchema(MU.getOrderedMap(elems), subSchema.required).success
               }
               case Failure(str) => str.fail
             }
+          }
+          case Success(FlattenObjectInfo) => {
+            FlatSchema(MU.getOrderedMap(Map.empty[String, Map[String, String]]), Set.empty[String]).success
           }
           case Failure(str) => str.fail
           case _ => s"Error: Function - 'flattenJsonSchema' - JsonSchema does not begin with an 'object' & 'properties'".fail
@@ -175,7 +183,8 @@ object SchemaFlattener {
   private[generators] def processProperties(propertyList: List[JField],
                                             accum: Map[String, Map[String, String]] = Map(),
                                             accumKey: String = "",
-                                            requiredKeys: Set[String] = Set.empty):
+                                            requiredKeys: Set[String] = Set.empty,
+                                            requiredAccum: Set[String] = Set.empty ):
     Validation[String, SubSchema] = {
 
     propertyList match {
@@ -183,12 +192,19 @@ object SchemaFlattener {
         val res: Validation[String, SubSchema] = x match {
           case (key, JObject(list)) => {
             getElemInfo(list) match {
-              case Success(ObjectInfo(properties, required)) =>
-                processProperties(properties, Map(), accumKey + key + ".", required)
-              case Success(ArrayInfo) =>
+              case Success(ObjectInfo(properties, required)) => {
+                val currentLevelRequired = if (requiredAccum.contains(key)) { required } else { Set.empty[String] }
+                val keys = properties.map(_._1).filter(currentLevelRequired.contains(_)).map(accumKey + key + "." + _)
+                processProperties(properties, Map(), accumKey + key + ".", keys.toSet, required)
+              }
+              case Success(FlattenObjectInfo) => {
+                SubSchema(Map(accumKey + key -> Map("type" -> "string")), Set.empty[String]).success
+              }
+              case Success(ArrayInfo) => {
                 SubSchema(Map(accumKey + key -> Map("type" -> "array")), Set.empty[String]).success
+              }
               case Success(_) => processAttributes(list) match {
-                case Success(attr) => SubSchema(Map(accumKey + key -> attr), requiredKeys).success
+                case Success(attr) => SubSchema(Map(accumKey + key -> attr), Set.empty[String]).success
                 case Failure(str)  => str.fail
               }
               case Failure(str) => str.fail
@@ -199,12 +215,12 @@ object SchemaFlattener {
 
         res match {
           case Success(goodRes) => {
-            processProperties(xs, (accum ++ goodRes.elems), accumKey, requiredKeys ++ goodRes.required)
+            processProperties(xs, (accum ++ goodRes.elems), accumKey, requiredKeys ++ goodRes.required, requiredAccum)
           }
           case Failure(badRes) => badRes.fail
         }
       }
-      case Nil => SubSchema(accum, requiredKeys.map(accumKey + _)).success
+      case Nil => SubSchema(accum, requiredKeys).success
     }
   }
 
@@ -214,7 +230,7 @@ object SchemaFlattener {
    * or 'array'.
    *
    * @param attributes The list of attributes that an element has
-   * @param accum The acuumulated Map of String -> String attributes
+   * @param accum The accumulated Map of String -> String attributes
    * @return a validated map of attributes or a failure string
    */
   @tailrec
@@ -244,6 +260,8 @@ object SchemaFlattener {
    * Takes a list of values (currently only numbers and strings) and converts
    * them into a single string delimited by a comma
    *
+   * List(JInt(3), JNull, JString(hello)) -> 3,null,hello
+   *
    * @param list The list of values to be combined
    * @param accum The accumulated String from the list
    * @param delim The deliminator to be used between strings
@@ -257,6 +275,8 @@ object SchemaFlattener {
           case JString(str) => stringifyArray(xs, (accum + delim + str))
           case JInt(x)      => stringifyArray(xs, (accum + delim + x.toString))
           case JDecimal(x)  => stringifyArray(xs, (accum + delim + x.toString))
+          case JDouble(x)   => stringifyArray(xs, (accum + delim + x.toString))
+          case JNull        => stringifyArray(xs, (accum + delim + "null"))
           case _            => s"Error: Function - 'processList' - Invalid JValue: $x in list".fail
         }
       }
@@ -294,8 +314,7 @@ object SchemaFlattener {
   /**
    * Returns information about a single list element:
    * - What 'core' type the element is (object,array,other)
-   * - If it is an 'object' returns the properties list for 
-   *   processing
+   * - If it is an 'object' returns the properties list for processing
    *
    * @param maybeAttrList The list of attributes which need to be analysed to
    *                      determine what to do with them
@@ -309,16 +328,18 @@ object SchemaFlattener {
         getElemType(types) match {
           case (Success(elemType)) => {
             elemType match {
-              case "object" => {    // TODO: probably won't work on complex product types
-                objectMap.get("properties") match {
-                  case Some(JObject(props)) => {
+              case "object" => {
+                // TODO: probably won't work on complex product types
+                (objectMap.get("properties"), objectMap.get("patternProperties"), objectMap.get("additionalProperties")) match {
+                  case (Some(JObject(props)), _, _) =>
                     val requiredFields = getRequiredProperties(objectMap)
                     requiredFields match {
                       case Success(required) => ObjectInfo(props, required.toSet).success
                       case Failure(str) => str.fail
                     }
-                  }
-                  case _ => s"Error: Function - 'getElemInfo' - JsonSchema 'object' does not have any properties".fail
+                  case (_, Some(JObject(_)), _) => FlattenObjectInfo.success
+                  case (_, _, Some(JBool(false))) => FlattenObjectInfo.success
+                  case _ => s"Error: Function - 'getElemInfo' - JsonSchema 'object' does not have properties nor patternProperties".fail
                 }
               }
               case "array"  => ArrayInfo.success
