@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2015 Snowplow Analytics Ltd. All rights reserved.
+ * Copyright (c) 2012-2016 Snowplow Analytics Ltd. All rights reserved.
  *
  * This program is licensed to you under the Apache License Version 2.0,
  * and you may not use this file except in compliance with the Apache License Version 2.0.
@@ -10,26 +10,15 @@
  * "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the Apache License Version 2.0 for the specific language governing permissions and limitations there under.
  */
-package com.snowplowanalytics
-
-// Scalaz
-import scalaz._
-import Scalaz._
-
-// Java
-import java.lang.{Integer => JInteger}
+package com.snowplowanalytics.schemaddl
 
 // Scala
 import scala.collection.immutable.ListMap
 
 /**
- * Scala package object to hold types,
- * helper methods etc.
- *
- * See:
- * http://www.artima.com/scalazine/articles/package_objects.html
+ * Data structures for intermediate Schema representations
  */
-package object schemaddl {
+object SchemaData {
   /**
    * Class containing all information taken from Self-describing Schema
    */
@@ -43,4 +32,5 @@ package object schemaddl {
    *              and it's unordered map of properties
    */
   case class FlatSchema(elems: ListMap[String, Map[String, String]], required: Set[String] = Set.empty[String])
+
 }

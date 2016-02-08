@@ -1,3 +1,11 @@
+Version 0.3.0 (2016-02-08)
+--------------------------
+Removed OpenJDK from .travis.yml (#48)
+Added Java interop (#45)
+Added recognition of multipleOf == 1 as integer (#42)
+Fixed nullable string with minLength == maxLength resulted to VARCHAR (#40)
+Fixed recognition of Decimal with multipleOf (#41)
+
 Version 0.2.0 (2015-09-14)
 --------------------------
 Added Scala 2.11 support (#28)
