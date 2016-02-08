@@ -13,6 +13,9 @@
 package com.snowplowanalytics.schemaddl
 package utils
 
+// This library
+import SchemaData.SelfDescInfo
+
 /**
  * Utilities for manipulating Strings
  */

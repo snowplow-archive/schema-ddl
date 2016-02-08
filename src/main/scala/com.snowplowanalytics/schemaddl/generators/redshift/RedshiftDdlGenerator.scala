@@ -28,6 +28,7 @@ import scala.collection.immutable.ListMap
 
 // This project
 import utils.{ StringUtils => SU }
+import SchemaData._
 
 /**
  * Generates a Redshift DDL File from a Flattened JsonSchema

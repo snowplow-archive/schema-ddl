@@ -25,6 +25,7 @@ import org.json4s._
 
 // This project
 import utils.{ MapUtils => MU }
+import SchemaData._
 
 /**
  * Flattens a JsonSchema into Strings representing the path to a field.
