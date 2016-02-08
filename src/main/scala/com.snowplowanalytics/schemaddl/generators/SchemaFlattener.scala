@@ -96,17 +96,17 @@ object SchemaFlattener {
                 val elems = if (splitProduct) splitProductTypes(subSchema.elems) else subSchema.elems
                 FlatSchema(MU.getOrderedMap(elems), subSchema.required).success
               }
-              case Failure(str) => str.fail
+              case Failure(str) => str.failure
             }
           }
           case Success(FlattenObjectInfo) => {
             FlatSchema(MU.getOrderedMap(Map.empty[String, Map[String, String]]), Set.empty[String]).success
           }
-          case Failure(str) => str.fail
-          case _ => s"Error: Function - 'flattenJsonSchema' - JsonSchema does not begin with an 'object' & 'properties'".fail
+          case Failure(str) => str.failure
+          case _ => s"Error: Function - 'flattenJsonSchema' - JsonSchema does not begin with an 'object' & 'properties'".failure
         }
       }
-      case _ => s"Error: Function - 'flattenJsonSchema' - Invalid Schema passed to flattener".fail
+      case _ => s"Error: Function - 'flattenJsonSchema' - Invalid Schema passed to flattener".failure
     }
   }
 
@@ -130,18 +130,18 @@ object SchemaFlattener {
       case (Some(vendor), Some(name), Some(version)) => {
         if (!vendor.matches(vendorPattern)) {
           (s"Error: Function - 'getSelfDescElems' - Vendor [$vendor] doesn't conform pattern. " +
-            "Must consist of only letters, numbers, underscores, hyphens and periods.").fail
+            "Must consist of only letters, numbers, underscores, hyphens and periods.").failure
         } else if (!name.matches(namePattern)) {
           (s"Error: Function - 'getSelfDescElems' - Name [$name] doesn't conform pattern. " +
-            "Must consist of only letters, numbers, underscores and hyphens.").fail
+            "Must consist of only letters, numbers, underscores and hyphens.").failure
         } else if (!version.matches(versionPattern)) {
           (s"Error: Function - 'getSelfDescElems' - Version [$version] doesn't conform pattern. " +
-            "Must look like 2-0-1.").fail
+            "Must look like 2-0-1.").failure
         } else {
           SelfDescInfo(vendor, name, version).success
         }
       }
-      case (_, _, _) => s"Error: Function - 'getSelfDescElems' - Schema does not contain all needed self describing elements".fail
+      case (_, _, _) => s"Error: Function - 'getSelfDescElems' - Schema does not contain all needed self describing elements".failure
     }
   }
 
@@ -205,19 +205,19 @@ object SchemaFlattener {
               }
               case Success(_) => processAttributes(list) match {
                 case Success(attr) => SubSchema(Map(accumKey + key -> attr), Set.empty[String]).success
-                case Failure(str)  => str.fail
+                case Failure(str)  => str.failure
               }
-              case Failure(str) => str.fail
+              case Failure(str) => str.failure
             }
           }
-          case _ => s"Error: Function - 'processProperties' - Invalid List Tuple2 Encountered".fail
+          case _ => s"Error: Function - 'processProperties' - Invalid List Tuple2 Encountered".failure
         }
 
         res match {
           case Success(goodRes) => {
             processProperties(xs, (accum ++ goodRes.elems), accumKey, requiredKeys ++ goodRes.required, requiredAccum)
           }
-          case Failure(badRes) => badRes.fail
+          case Failure(badRes) => badRes.failure
         }
       }
       case Nil => SubSchema(accum, requiredKeys).success
@@ -241,7 +241,7 @@ object SchemaFlattener {
           case (key, JArray(value))  => {
             stringifyArray(value) match {
               case Success(strs) => processAttributes(xs, (accum ++ Map(key -> strs)))
-              case Failure(str) => str.fail
+              case Failure(str) => str.failure
             }
           }
           case (key, JBool(value))    => processAttributes(xs, (accum ++ Map(key -> value.toString)))
@@ -250,7 +250,7 @@ object SchemaFlattener {
           case (key, JDouble(value))  => processAttributes(xs, (accum ++ Map(key -> value.toString)))
           case (key, JNull)           => processAttributes(xs, (accum ++ Map(key -> "null")))
           case (key, JString(value))  => processAttributes(xs, (accum ++ Map(key -> value)))
-          case _                      => s"Error: Function - 'processAttributes' - Invalid JValue found".fail
+          case _                      => s"Error: Function - 'processAttributes' - Invalid JValue found".failure
         }
       }
       case Nil => accum.success
@@ -277,7 +277,7 @@ object SchemaFlattener {
           case JDecimal(x)  => stringifyArray(xs, (accum + delim + x.toString))
           case JDouble(x)   => stringifyArray(xs, (accum + delim + x.toString))
           case JNull        => stringifyArray(xs, (accum + delim + "null"))
-          case _            => s"Error: Function - 'processList' - Invalid JValue: $x in list".fail
+          case _            => s"Error: Function - 'processList' - Invalid JValue: $x in list".failure
         }
       }
       case Nil => accum.drop(1).success
@@ -297,15 +297,15 @@ object SchemaFlattener {
         acc match {
           case Success(l) => str match {
             case JString(s) => (s :: l).success
-            case _ => "required property must contain only strings".fail
+            case _ => "required property must contain only strings".failure
           }
-          case Failure(f) => f.fail
+          case Failure(f) => f.failure
         }
       }
     jObject.get("required") match {
       case Some(required) => required match {
         case JArray(list) => JStringToString(list)
-        case _ => "required property must contain array of keys".fail
+        case _ => "required property must contain array of keys".failure
       }
       case None => Nil.success
     }
@@ -335,22 +335,22 @@ object SchemaFlattener {
                     val requiredFields = getRequiredProperties(objectMap)
                     requiredFields match {
                       case Success(required) => ObjectInfo(props, required.toSet).success
-                      case Failure(str) => str.fail
+                      case Failure(str) => str.failure
                     }
                   case (_, Some(JObject(_)), _) => FlattenObjectInfo.success
                   case (_, _, Some(JBool(false))) => FlattenObjectInfo.success
-                  case _ => s"Error: Function - 'getElemInfo' - JsonSchema 'object' does not have properties nor patternProperties".fail
+                  case _ => s"Error: Function - 'getElemInfo' - JsonSchema 'object' does not have properties nor patternProperties".failure
                 }
               }
               case "array"  => ArrayInfo.success
               case _        => PrimitiveInfo.success // Pass back a successful empty Map for a normal entry (Should come up with something better...)
             }
           }
-          case Failure(str) => str.fail
+          case Failure(str) => str.failure
         }
       }
       case None if objectMap.get("enum").isDefined => PrimitiveInfo.success
-      case _ => s"Error: Function - 'getElemInfo' - List does not contain 'type' or 'enum' field".fail
+      case _ => s"Error: Function - 'getElemInfo' - List does not contain 'type' or 'enum' field".failure
     }
   }
 
@@ -367,7 +367,7 @@ object SchemaFlattener {
     val maybeTypes = types match {
       case JString(value) => value.success
       case JArray(list) => stringifyArray(list)
-      case _ => s"Error: Function - 'getElemType' - Type List contains invalid JValue".fail
+      case _ => s"Error: Function - 'getElemType' - Type List contains invalid JValue".failure
     }
     maybeTypes match {
       case Success(str) => {
@@ -381,7 +381,7 @@ object SchemaFlattener {
           "".success
         }
       }
-      case Failure(str) => str.fail
+      case Failure(str) => str.failure
     }
   }
 

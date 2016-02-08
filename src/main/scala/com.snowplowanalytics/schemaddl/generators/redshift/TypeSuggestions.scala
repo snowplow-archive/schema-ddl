@@ -61,8 +61,8 @@ object TypeSuggestions {
     }
 
   val numberSuggestion: DataTypeSuggestion = (properties, columnName) =>
-    (properties.get("type"), properties.get("multiplyOf")) match {
-      case (Some(types), Some(multiplyOf)) if (types.contains("number") && multiplyOf == "0.01") =>
+    (properties.get("type"), properties.get("multipleOf")) match {
+      case (Some(types), Some(multipleOf)) if (types.contains("number") && multipleOf == "0.01") =>
         Some(DataTypes.RedshiftDecimal(Some(36), Some(2)))
       case (Some(types), _) if types.contains("number") =>
         Some(DataTypes.RedshiftDouble)
