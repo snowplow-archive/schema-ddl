@@ -93,7 +93,8 @@ object TypeSuggestions {
 
   val charSuggestion: DataTypeSuggestion = (properties, columnName) => {
     (properties.get("type"), properties.get("minLength"), properties.get("maxLength")) match {
-      case (Some("string"), Some(SU.IntegerAsString(minLength)), Some(SU.IntegerAsString(maxLength))) if minLength == maxLength =>
+      case (Some(types), Some(SU.IntegerAsString(minLength)), Some(SU.IntegerAsString(maxLength)))
+        if (minLength == maxLength && excludeNull(types) == Set("string")) =>
         Some(DataTypes.RedshiftChar(maxLength))
       case _ => None
     }
