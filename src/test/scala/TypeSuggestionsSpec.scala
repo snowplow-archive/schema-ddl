@@ -25,10 +25,23 @@ import redshift.Ddl.DataTypes._
 class TypeSuggestionsSpec extends Specification with ValidationMatchers { def is = s2"""
   Check type suggestions
     suggest decimal for multipleOf == 0.01  $e1
+    suggest integer for multipleOf == 1  $e2
+    handle invalid enum   $e3
   """
 
   def e1 = {
     val props = Map("type" -> "number", "multipleOf" -> "0.01")
     RedshiftDdlGenerator.getDataType(props, 16,"somecolumn") must beEqualTo(RedshiftDecimal(Some(36), Some(2)))
+  }
+
+  def e2 = {
+    val props = Map("type" -> "number", "multipleOf" -> "1")
+    RedshiftDdlGenerator.getDataType(props, 16,"somecolumn") must beEqualTo(RedshiftInteger)
+  }
+
+  def e3 = {
+    val props = Map("type" -> "integer", "multipleOf" -> "1", "enum" -> "2,3,5,\"hello\",32")
+    RedshiftDdlGenerator.getDataType(props, 16,"somecolumn") must beEqualTo(RedshiftVarchar(7))
+
   }
 }

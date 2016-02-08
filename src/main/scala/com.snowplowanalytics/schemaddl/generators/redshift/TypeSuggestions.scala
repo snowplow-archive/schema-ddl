@@ -14,7 +14,12 @@ package com.snowplowanalytics.schemaddl
 package generators
 package redshift
 
+// Scalaz
+import scalaz._
+import Scalaz._
+
 // This project
+import com.snowplowanalytics.schemaddl.generators.redshift.Ddl.DataTypes.RedshiftInteger
 import utils.{ StringUtils => SU }
 
 /**
@@ -70,16 +75,18 @@ object TypeSuggestions {
     }
 
   val integerSuggestion: DataTypeSuggestion = (properties, columnName) => {
-    (properties.get("type"), properties.get("maximum"), properties.get("enum")) match {
-      case (Some("integer"), Some(maximum), _) =>
-        val max = maximum.toLong
-        getIntSize(max)
+    (properties.get("type"), properties.get("maximum"), properties.get("enum"), properties.get("multipleOf")) match {
+      case (Some("integer"), Some(maximum), _, _) =>
+        getIntSize(maximum)
       // Contains only enum
-      case (types, _, Some(enum)) if ((!types.isDefined || types.get == "integer") && SU.isIntegerList(enum)) =>
-        val max = enum.split(",").toList.map(_.toLong).max
-        getIntSize(max)
-      case (Some("integer"), _, _) =>
+      case (types, _, Some(enum), _) if ((!types.isDefined || types.get == "integer") && SU.isIntegerList(enum)) =>
+        val max = enum.split(",").toList.map(el => try (Some(el.toLong)) catch { case e: NumberFormatException => None } )
+        val maxLong = max.sequence.getOrElse(Nil).maximum
+        maxLong.flatMap(m => getIntSize(m))   // This will short-circuit integer suggestions on any non-integer enum
+      case (Some("integer"), _, _, _) =>
         Some(DataTypes.RedshiftBigInt)
+      case (Some(types), max, _, Some(multipleOf)) if (types.contains("number") && multipleOf == "1") =>
+        max.flatMap(m => getIntSize(m)).orElse(Some(RedshiftInteger))
       case _ => None
     }
   }
@@ -135,6 +142,20 @@ object TypeSuggestions {
    * @return set of strings
    */
   private def excludeNull(types: String): Set[String] = types.split(",").toSet - "null"
+
+  /**
+   * Helper function to get size of Integer
+   *
+   * @param max upper bound extracted from properties as string
+   * @return Long representing biggest possible value or None if it's not Int
+   */
+  private def getIntSize(max: => String): Option[DataType] =
+    try {
+      val maxLong = max.toLong
+      getIntSize(maxLong)
+    } catch {
+      case e: NumberFormatException => None
+    }
 
   /**
    * Helper function to get size of Integer
