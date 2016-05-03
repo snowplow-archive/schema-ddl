@@ -28,6 +28,8 @@ class TypeSuggestionsSpec extends Specification with ValidationMatchers { def is
     suggest integer for multipleOf == 1  $e2
     handle invalid enum   $e3
     recognize string,null maxLength == minLength as CHAR  $e4
+    recognize number with product type $e5
+    recognize integer with product type $e6
   """
 
   def e1 = {
@@ -48,5 +50,15 @@ class TypeSuggestionsSpec extends Specification with ValidationMatchers { def is
   def e4 = {
     val props = Map("type" -> "string,null", "minLength" -> "12", "maxLength" -> "12")
     RedshiftDdlGenerator.getDataType(props, 16,"somecolumn") must beEqualTo(RedshiftChar(12))
+  }
+
+  def e5 = {
+    val props = Map("type" -> "number,null")
+    RedshiftDdlGenerator.getDataType(props, 16,"somecolumn") must beEqualTo(RedshiftDouble)
+  }
+
+  def e6 = {
+    val props = Map("type" -> "integer,null")
+    RedshiftDdlGenerator.getDataType(props, 16,"somecolumn") must beEqualTo(RedshiftBigInt)
   }
 }

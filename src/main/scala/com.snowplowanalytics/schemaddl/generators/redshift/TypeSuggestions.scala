@@ -67,7 +67,7 @@ object TypeSuggestions {
 
   val numberSuggestion: DataTypeSuggestion = (properties, columnName) =>
     (properties.get("type"), properties.get("multipleOf")) match {
-      case (Some(types), Some(multipleOf)) if (types.contains("number") && multipleOf == "0.01") =>
+      case (Some(types), Some(multipleOf)) if types.contains("number") && multipleOf == "0.01" =>
         Some(DataTypes.RedshiftDecimal(Some(36), Some(2)))
       case (Some(types), _) if types.contains("number") =>
         Some(DataTypes.RedshiftDouble)
@@ -76,16 +76,16 @@ object TypeSuggestions {
 
   val integerSuggestion: DataTypeSuggestion = (properties, columnName) => {
     (properties.get("type"), properties.get("maximum"), properties.get("enum"), properties.get("multipleOf")) match {
-      case (Some("integer"), Some(maximum), _, _) =>
+      case (Some(types), Some(maximum), _, _) if excludeNull(types) == Set("integer") =>
         getIntSize(maximum)
       // Contains only enum
-      case (types, _, Some(enum), _) if ((!types.isDefined || types.get == "integer") && SU.isIntegerList(enum)) =>
-        val max = enum.split(",").toList.map(el => try (Some(el.toLong)) catch { case e: NumberFormatException => None } )
+      case (types, _, Some(enum), _) if (types.isEmpty || excludeNull(types.get) == Set("integer")) && SU.isIntegerList(enum) =>
+        val max = enum.split(",").toList.map(el => try Some(el.toLong) catch { case e: NumberFormatException => None } )
         val maxLong = max.sequence.getOrElse(Nil).maximum
         maxLong.flatMap(m => getIntSize(m))   // This will short-circuit integer suggestions on any non-integer enum
-      case (Some("integer"), _, _, _) =>
+      case (Some(types), _, _, _) if excludeNull(types) == Set("integer") =>
         Some(DataTypes.RedshiftBigInt)
-      case (Some(types), max, _, Some(multipleOf)) if (types.contains("number") && multipleOf == "1") =>
+      case (Some(types), max, _, Some(multipleOf)) if types.contains("number") && multipleOf == "1" =>
         max.flatMap(m => getIntSize(m)).orElse(Some(RedshiftInteger))
       case _ => None
     }
