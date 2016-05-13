@@ -1,3 +1,9 @@
+Version 0.3.1 (2016-05-14)
+--------------------------
+Fixed incorrect type suggestion for integer with null (#50)
+Added handling an object with no properties or patternProperties specified as VARCHAR (#56)
+Added handling of anything-* schemas as tables without custom columns (#43)
+
 Version 0.3.0 (2016-02-08)
 --------------------------
 Removed OpenJDK from .travis.yml (#48)
