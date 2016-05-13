@@ -195,7 +195,7 @@ object SchemaFlattener {
             getElemInfo(list) match {
               case Success(ObjectInfo(properties, required)) => {
                 val currentLevelRequired = if (requiredAccum.contains(key)) { required } else { Set.empty[String] }
-                val keys = properties.map(_._1).filter(currentLevelRequired.contains(_)).map(accumKey + key + "." + _)
+                val keys = properties.map(_._1).filter(currentLevelRequired.contains).map(accumKey + key + "." + _)
                 processProperties(properties, Map(), accumKey + key + ".", keys.toSet, required)
               }
               case Success(FlattenObjectInfo) => {
@@ -331,16 +331,14 @@ object SchemaFlattener {
             elemType match {
               case "object" => {
                 // TODO: probably won't work on complex product types
-                (objectMap.get("properties"), objectMap.get("patternProperties"), objectMap.get("additionalProperties")) match {
-                  case (Some(JObject(props)), _, _) =>
+                objectMap.get("properties") match {
+                  case Some(JObject(props)) =>
                     val requiredFields = getRequiredProperties(objectMap)
                     requiredFields match {
                       case Success(required) => ObjectInfo(props, required.toSet).success
-                      case Failure(str) => str.failure
+                      case Failure(str)      => str.failure
                     }
-                  case (_, Some(JObject(_)), _) => FlattenObjectInfo.success
-                  case (_, _, Some(JBool(false))) => FlattenObjectInfo.success
-                  case _ => s"Error: Function - 'getElemInfo' - JsonSchema 'object' does not have properties nor patternProperties".failure
+                  case _ => FlattenObjectInfo.success
                 }
               }
               case "array"  => ArrayInfo.success
