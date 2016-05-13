@@ -349,7 +349,7 @@ object SchemaFlattener {
         }
       }
       case None if objectMap.get("enum").isDefined => PrimitiveInfo.success
-      case _ => s"Error: Function - 'getElemInfo' - List does not contain 'type' or 'enum' field".failure
+      case _ => FlattenObjectInfo.success
     }
   }
 

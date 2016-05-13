@@ -38,6 +38,7 @@ class SchemaFlattenerSpec extends Specification with ValidationMatchers { def is
     process properties with nested nullable $e6
     process Schema with no properties or patternProperties specified $e7
     process key with no properties or patternProperties specified as string $e8
+    handle anything schema $e9
   """
 
   def e1 = {
@@ -124,6 +125,26 @@ class SchemaFlattenerSpec extends Specification with ValidationMatchers { def is
     SchemaFlattener.flattenJsonSchema(json, splitProduct = true) must beSuccessful.like {
       case flatSchema => flatSchema must beEqualTo(FlatSchema(ListMap("nested.object_without_properties" -> Map("type" -> "string"))))
     }
+  }
+
+  def e9 = {
+    val json = parse(
+      """
+        |{
+        |	"description": "Wildcard schema #1 to match any valid JSON instance",
+        |	"self": {
+        |		"vendor": "com.snowplowanalytics.iglu",
+        |		"name": "anything-a",
+        |		"format": "jsonschema",
+        |		"version": "1-0-0"
+        |	}
+        |}
+      """.stripMargin)
+
+    SchemaFlattener.flattenJsonSchema(json, splitProduct = true) must beSuccessful.like {
+      case flatSchema => flatSchema must beEqualTo(FlatSchema(ListMap.empty[String, Map[String, String]]))
+    }
+
   }
 
 }
