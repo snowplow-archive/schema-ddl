@@ -2,6 +2,8 @@
 
 [ ![Build Status] [travis-image] ] [travis]  [ ![Release] [release-image] ] [releases] [ ![License] [license-image] ] [license]
 
+**WARNING! THIS REPOSITORY HAS BEEN DEPRECATED. [SCHEMA DDL][new-path] IS NOW PART OF THE [IGLU][iglu] PROJECT**
+
 Schema DDL is a set of generators for producing various DDL formats from JSON Schemas.
 It's tightly coupled with other tools from **[Snowplow Platform] [snowplow]** like
 **[Iglu] [iglu]** and **[Self-describing JSON] [self-describing]** and used mostly in **[Schema Guru] [schema-guru]**.
@@ -52,6 +54,8 @@ See the License for the specific language governing permissions and
 limitations under the License.
 
 
+[new-path]: https://github.com/snowplow/iglu/tree/master/0-common/schema-ddl
+[iglu]: https://github.com/snowplow/iglu
 
 [travis]: https://travis-ci.org/snowplow/schema-ddl
 [travis-image]: https://travis-ci.org/snowplow/schema-ddl.png?branch=master
